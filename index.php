@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insertParams = [];
 
                 foreach ($dependencies as $index => $dependency) {
-                    $valueClauses[] = sprintf('(:component_id_%1$d, :name_%1$d, :version_%1$d)', $index);
+                    $valueClauses[] = '(:component_id_' . $index . ', :name_' . $index . ', :version_' . $index . ')';
                     $insertParams['component_id_' . $index] = $componentId;
                     $insertParams['name_' . $index] = $dependency['name'];
                     $insertParams['version_' . $index] = $dependency['version'];
