@@ -19,3 +19,5 @@ CREATE TABLE IF NOT EXISTS dependencies (
     name VARCHAR(255) NOT NULL,
     version VARCHAR(100) NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_dependencies_component_id ON dependencies(component_id);

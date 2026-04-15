@@ -52,16 +52,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($dependencies !== []) {
-                $dependencyStmt = $pdo->prepare(
-                    'INSERT INTO dependencies(component_id, name, version) VALUES(:component_id, :name, :version)'
-                );
-                foreach ($dependencies as $dependency) {
-                    $dependencyStmt->execute([
-                        'component_id' => $componentId,
-                        'name' => $dependency['name'],
-                        'version' => $dependency['version'],
-                    ]);
+                $valueClauses = [];
+                $insertParams = [];
+
+                foreach ($dependencies as $index => $dependency) {
+                    $valueClauses[] = sprintf('(:component_id_%1$d, :name_%1$d, :version_%1$d)', $index);
+                    $insertParams['component_id_' . $index] = $componentId;
+                    $insertParams['name_' . $index] = $dependency['name'];
+                    $insertParams['version_' . $index] = $dependency['version'];
                 }
+
+                $dependencyStmt = $pdo->prepare(
+                    'INSERT INTO dependencies(component_id, name, version) VALUES ' . implode(', ', $valueClauses)
+                );
+                $dependencyStmt->execute($insertParams);
             }
 
             $pdo->commit();

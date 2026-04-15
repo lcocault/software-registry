@@ -79,7 +79,7 @@ final class DependencyParser
                 continue;
             }
 
-            if (strpos($line, '==') !== false) {
+            if (str_contains($line, '==')) {
                 [$name, $version] = explode('==', $line, 2);
             } else {
                 $parts = preg_split('/\s+/', $line) ?: [];
