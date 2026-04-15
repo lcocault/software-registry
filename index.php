@@ -6,6 +6,7 @@ require_once __DIR__ . '/src/database.php';
 require_once __DIR__ . '/src/DependencyParser.php';
 
 $languages = ['Java', 'Python', 'JavaScript'];
+$maxDependencyImportFileSize = 2 * 1024 * 1024;
 $message = null;
 $messageType = 'success';
 
@@ -45,8 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dependencies = [];
             $upload = $_FILES['dependencies_file'] ?? null;
             if ($upload && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $size = (int) ($upload['size'] ?? 0);
+                if ($size > $maxDependencyImportFileSize) {
+                    throw new RuntimeException('Dependency file is too large (max 2 MB).');
+                }
+
                 $content = file_get_contents($upload['tmp_name']);
-                if ($content !== false) {
+                if ($content !== false && strlen($content) <= $maxDependencyImportFileSize) {
                     $dependencies = DependencyParser::parse($language, $content);
                 }
             }
@@ -54,18 +60,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($dependencies !== []) {
                 $valueClauses = [];
                 $insertParams = [];
+                $validDependencies = [];
 
-                foreach ($dependencies as $index => $dependency) {
+                foreach ($dependencies as $dependency) {
+                    if (
+                        strlen($dependency['name']) <= 255 &&
+                        strlen($dependency['version']) <= 100
+                    ) {
+                        $validDependencies[] = $dependency;
+                    }
+                }
+
+                foreach ($validDependencies as $index => $dependency) {
                     $valueClauses[] = '(:component_id_' . $index . ', :name_' . $index . ', :version_' . $index . ')';
                     $insertParams['component_id_' . $index] = $componentId;
                     $insertParams['name_' . $index] = $dependency['name'];
                     $insertParams['version_' . $index] = $dependency['version'];
                 }
 
-                $dependencyStmt = $pdo->prepare(
-                    'INSERT INTO dependencies(component_id, name, version) VALUES ' . implode(', ', $valueClauses)
-                );
-                $dependencyStmt->execute($insertParams);
+                if ($valueClauses !== []) {
+                    $dependencyStmt = $pdo->prepare(
+                        'INSERT INTO dependencies(component_id, name, version) VALUES ' . implode(', ', $valueClauses)
+                    );
+                    $dependencyStmt->execute($insertParams);
+                }
+
+                $dependencies = $validDependencies;
             }
 
             $pdo->commit();
@@ -88,7 +108,8 @@ try {
         'SELECT c.id, c.name, c.version, c.owner, c.language, p.name AS project_name
          FROM components c
          JOIN projects p ON p.id = c.project_id
-         ORDER BY c.id DESC'
+         ORDER BY c.id DESC
+         LIMIT 200'
     )->fetchAll();
     $dependenciesByComponent = [];
     if ($components !== []) {
