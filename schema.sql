@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS components (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_components_project_id ON components(project_id);
+
 CREATE TABLE IF NOT EXISTS dependencies (
     id SERIAL PRIMARY KEY,
     component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,

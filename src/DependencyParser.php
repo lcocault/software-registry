@@ -105,7 +105,12 @@ final class DependencyParser
      */
     private static function parsePackageLock(string $content): array
     {
-        $decoded = json_decode($content, true);
+        try {
+            $decoded = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return [];
+        }
+
         if (!is_array($decoded)) {
             return [];
         }

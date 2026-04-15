@@ -90,19 +90,29 @@ try {
          JOIN projects p ON p.id = c.project_id
          ORDER BY c.id DESC'
     )->fetchAll();
-    $dependencyRows = $pdo->query(
-        'SELECT component_id, name, version
-         FROM dependencies
-         ORDER BY name'
-    )->fetchAll();
-
     $dependenciesByComponent = [];
-    foreach ($dependencyRows as $dependencyRow) {
-        $componentId = (int) $dependencyRow['component_id'];
-        $dependenciesByComponent[$componentId][] = [
-            'name' => $dependencyRow['name'],
-            'version' => $dependencyRow['version'],
-        ];
+    if ($components !== []) {
+        $componentIds = array_map(static fn (array $component): int => (int) $component['id'], $components);
+        $placeholderTokens = array_map(static fn (int $index): string => ':id_' . $index, array_keys($componentIds));
+        $dependencyStmt = $pdo->prepare(
+            'SELECT component_id, name, version
+             FROM dependencies
+             WHERE component_id IN (' . implode(', ', $placeholderTokens) . ')
+             ORDER BY name'
+        );
+
+        foreach ($componentIds as $index => $componentId) {
+            $dependencyStmt->bindValue(':id_' . $index, $componentId, PDO::PARAM_INT);
+        }
+        $dependencyStmt->execute();
+
+        foreach ($dependencyStmt->fetchAll() as $dependencyRow) {
+            $componentId = (int) $dependencyRow['component_id'];
+            $dependenciesByComponent[$componentId][] = [
+                'name' => $dependencyRow['name'],
+                'version' => $dependencyRow['version'],
+            ];
+        }
     }
 } catch (Throwable $exception) {
     $components = [];
