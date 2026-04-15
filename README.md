@@ -24,7 +24,7 @@ The registration form supports dependency import from:
    - `DB_PORT` (default `5432`)
    - `DB_NAME` (default `software_registry`)
    - `DB_USER` (default `postgres`)
-   - `DB_PASSWORD` (default `postgres`)
+   - `DB_PASSWORD` (**required**)
 2. Initialize schema:
    ```sql
    \i schema.sql

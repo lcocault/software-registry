@@ -73,7 +73,7 @@ final class DependencyParser
             $line = trim($line);
             if (
                 $line === '' ||
-                stripos($line, 'package') === 0 ||
+                preg_match('/^Package\s+Version$/', $line) === 1 ||
                 str_starts_with($line, '---')
             ) {
                 continue;

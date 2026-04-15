@@ -198,7 +198,7 @@ try {
         </thead>
         <tbody>
         <?php if ($components === []): ?>
-            <tr><td colspan="6">No component registered yet.</td></tr>
+            <tr><td colspan="6">No components registered yet.</td></tr>
         <?php else: ?>
             <?php foreach ($components as $component): ?>
                 <tr>

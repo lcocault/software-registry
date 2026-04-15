@@ -8,7 +8,11 @@ function getDatabaseConnection(): PDO
     $port = getenv('DB_PORT') ?: '5432';
     $dbName = getenv('DB_NAME') ?: 'software_registry';
     $user = getenv('DB_USER') ?: 'postgres';
-    $password = getenv('DB_PASSWORD') ?: 'postgres';
+    $password = getenv('DB_PASSWORD');
+
+    if ($password === false || $password === '') {
+        throw new RuntimeException('DB_PASSWORD environment variable must be set.');
+    }
 
     $dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s', $host, $port, $dbName);
 
