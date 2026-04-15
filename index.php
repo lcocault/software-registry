@@ -86,11 +86,23 @@ try {
          JOIN projects p ON p.id = c.project_id
          ORDER BY c.id DESC'
     )->fetchAll();
+    $dependencyRows = $pdo->query(
+        'SELECT component_id, name, version
+         FROM dependencies
+         ORDER BY name'
+    )->fetchAll();
 
-    $dependencyStmt = $pdo->prepare('SELECT name, version FROM dependencies WHERE component_id = :component_id ORDER BY name');
+    $dependenciesByComponent = [];
+    foreach ($dependencyRows as $dependencyRow) {
+        $componentId = (int) $dependencyRow['component_id'];
+        $dependenciesByComponent[$componentId][] = [
+            'name' => $dependencyRow['name'],
+            'version' => $dependencyRow['version'],
+        ];
+    }
 } catch (Throwable $exception) {
     $components = [];
-    $dependencyStmt = null;
+    $dependenciesByComponent = [];
     if ($message === null) {
         $message = 'Unable to connect to database: ' . $exception->getMessage();
         $messageType = 'error';
@@ -182,20 +194,15 @@ try {
                     <td><?= htmlspecialchars($component['project_name'], ENT_QUOTES, 'UTF-8') ?></td>
                     <td><?= htmlspecialchars($component['language'], ENT_QUOTES, 'UTF-8') ?></td>
                     <td>
-                        <?php if ($dependencyStmt instanceof PDOStatement): ?>
-                            <?php $dependencyStmt->execute(['component_id' => $component['id']]); ?>
-                            <?php $dependencies = $dependencyStmt->fetchAll(); ?>
-                            <?php if ($dependencies === []): ?>
-                                No dependencies.
-                            <?php else: ?>
-                                <ul>
-                                    <?php foreach ($dependencies as $dependency): ?>
-                                        <li><?= htmlspecialchars($dependency['name'], ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars($dependency['version'], ENT_QUOTES, 'UTF-8') ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            <?php endif; ?>
+                        <?php $dependencies = $dependenciesByComponent[(int) $component['id']] ?? []; ?>
+                        <?php if ($dependencies === []): ?>
+                            No dependencies.
                         <?php else: ?>
-                            Unavailable.
+                            <ul>
+                                <?php foreach ($dependencies as $dependency): ?>
+                                    <li><?= htmlspecialchars($dependency['name'], ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars($dependency['version'], ENT_QUOTES, 'UTF-8') ?></li>
+                                <?php endforeach; ?>
+                            </ul>
                         <?php endif; ?>
                     </td>
                 </tr>

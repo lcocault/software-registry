@@ -26,7 +26,7 @@ final class DependencyParser
         $lines = preg_split('/\R/', $content) ?: [];
 
         foreach ($lines as $line) {
-            if (strpos($line, '+-') === false && strpos($line, '\\-') === false) {
+            if (!str_contains($line, '+-') && !str_contains($line, '\\-')) {
                 continue;
             }
 
