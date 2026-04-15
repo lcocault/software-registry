@@ -101,10 +101,11 @@ try {
              ORDER BY name'
         );
 
+        $dependencyParams = [];
         foreach ($componentIds as $index => $componentId) {
-            $dependencyStmt->bindValue(':id_' . $index, $componentId, PDO::PARAM_INT);
+            $dependencyParams['id_' . $index] = $componentId;
         }
-        $dependencyStmt->execute();
+        $dependencyStmt->execute($dependencyParams);
 
         foreach ($dependencyStmt->fetchAll() as $dependencyRow) {
             $componentId = (int) $dependencyRow['component_id'];
