@@ -27,7 +27,7 @@ The registration form supports dependency import from:
    - `DB_PASSWORD` (**required**)
 2. Initialize schema:
    ```sql
-   \i schema.sql
+   \i database/schema.sql
    ```
 3. Start PHP server:
    ```bash
