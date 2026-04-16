@@ -23,15 +23,17 @@ final class DependencyParser
     private static function parseMavenDependencyTree(string $content): array
     {
         $dependencies = [];
-        $lines = preg_split('/\R/', $content) ?: [];
+        $lines = preg_split('/\r\n|\r|\n/', $content) ?: [];
 
         foreach ($lines as $line) {
-            if (!str_contains($line, '+-') && !str_contains($line, '\\-')) {
+            // Strip optional [INFO] prefix (from mvn terminal output), then trim whitespace
+            $normalized = preg_replace('/^\[INFO\]\s*/', '', trim($line));
+            if ($normalized === null) {
                 continue;
             }
 
-            $normalized = preg_replace('/^\[INFO\]\s*/', '', trim($line));
-            if ($normalized === null) {
+            // A dependency line starts with optional '|' / space padding, then '+- ' or '\- '
+            if (!preg_match('/^[|\s]*[+\\\\]-/', $normalized)) {
                 continue;
             }
 
