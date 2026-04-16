@@ -43,8 +43,6 @@
                 <i class="fas <?= $editComponent !== null ? 'fa-floppy-disk' : 'fa-plus' ?>"></i>
                 <?= $editComponent !== null ? 'Update component' : 'Register component' ?>
             </button>
-            <?php if ($editComponent !== null): ?>
-                <a href="." class="btn btn-cancel"><i class="fas fa-xmark"></i> Cancel</a>
-            <?php endif; ?>
+            <a href="." class="btn btn-cancel"><i class="fas fa-xmark"></i> Cancel</a>
         </div>
     </form>

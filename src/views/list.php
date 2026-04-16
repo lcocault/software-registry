@@ -8,7 +8,10 @@ $langIcons = [
     'JavaScript' => 'fab fa-js',
 ];
 ?>
-    <h2 class="card-title"><i class="fas fa-list-check"></i> Registered components</h2>
+    <div class="card-title-bar">
+        <h2 class="card-title"><i class="fas fa-list-check"></i> Registered components</h2>
+        <a href="?action=register" class="btn btn-primary"><i class="fas fa-plus"></i> Register component</a>
+    </div>
     <?php if ($components === []): ?>
         <p class="empty-state"><i class="fas fa-inbox"></i> No components registered yet.</p>
     <?php else: ?>
