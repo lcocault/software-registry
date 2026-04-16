@@ -163,6 +163,14 @@ if ($repository !== null) {
         }
     }
 }
+
+$isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
+    && ($_POST['action'] ?? 'create') !== 'delete'
+    && $messageType === 'error';
+
+$showForm = $editComponent !== null
+    || (isset($_GET['action']) && in_array($_GET['action'], ['register'], true))
+    || $isFailedFormSubmission;
 ?>
 <!doctype html>
 <html lang="en">
@@ -572,6 +580,14 @@ if ($repository !== null) {
 
         .actions { white-space: nowrap; }
         .actions form { display: inline; }
+
+        .card-title-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .card-title-bar .card-title { margin-bottom: 0; }
     </style>
 </head>
 <body>
@@ -600,6 +616,7 @@ if ($repository !== null) {
             </div>
         <?php endif; ?>
 
+        <?php if ($showForm): ?>
         <div class="card">
             <h2 class="card-title">
                 <i class="fas <?= $editComponent !== null ? 'fa-pen-to-square' : 'fa-plus-circle' ?>"></i>
@@ -607,6 +624,7 @@ if ($repository !== null) {
             </h2>
             <?php include __DIR__ . '/src/views/form.php'; ?>
         </div>
+        <?php endif; ?>
 
         <div class="card">
             <?php include __DIR__ . '/src/views/list.php'; ?>
