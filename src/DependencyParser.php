@@ -32,7 +32,9 @@ final class DependencyParser
                 continue;
             }
 
-            // A dependency line starts with optional '|' / space padding, then '+- ' or '\- '
+            // A dependency line starts with optional '|' / space padding, then '+- ' or '\- '.
+            // [+\\\\] in a PHP single-quoted string encodes the character class [+\\] in the
+            // PCRE pattern, which matches either '+' or a literal backslash.
             if (!preg_match('/^[|\s]*[+\\\\]-/', $normalized)) {
                 continue;
             }
