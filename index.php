@@ -14,7 +14,15 @@ $message = null;
 $messageType = 'success';
 $editComponent = null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$repository = null;
+try {
+    $repository = new ComponentRepository(getDatabaseConnection());
+} catch (Throwable $exception) {
+    $message = 'Unable to connect to database: ' . $exception->getMessage();
+    $messageType = 'error';
+}
+
+if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
 
     if ($action === 'delete') {
@@ -24,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } else {
             try {
-                $repository = new ComponentRepository(getDatabaseConnection());
                 if (!$repository->delete($componentId)) {
                     $message = 'Component not found.';
                     $messageType = 'error';
@@ -72,7 +79,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $dependenciesImported = count($dependencies);
                 }
 
-                $repository = new ComponentRepository(getDatabaseConnection());
                 if (!$repository->update($componentId, $name, $version, $owner, $project, $language, $dependencies)) {
                     $message = 'Component not found.';
                     $messageType = 'error';
@@ -119,7 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $repository = new ComponentRepository(getDatabaseConnection());
                 $repository->save($name, $version, $owner, $project, $language, $dependencies);
                 $message = sprintf('Component saved successfully (%d dependencies imported).', count($dependencies));
                 $messageType = 'success';
@@ -131,11 +136,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['edit'])) {
+if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['edit'])) {
     $editId = (int) $_GET['edit'];
     if ($editId > 0) {
         try {
-            $repository = new ComponentRepository(getDatabaseConnection());
             $editComponent = $repository->findById($editId);
             if ($editComponent === null) {
                 $message = 'Component not found.';
@@ -148,14 +152,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['edit'])) {
     }
 }
 
-try {
-    $repository = new ComponentRepository(getDatabaseConnection());
-    $components = $repository->listAll();
-} catch (Throwable $exception) {
-    $components = [];
-    if ($message === null) {
-        $message = 'Unable to connect to database: ' . $exception->getMessage();
-        $messageType = 'error';
+$components = [];
+if ($repository !== null) {
+    try {
+        $components = $repository->listAll();
+    } catch (Throwable $exception) {
+        if ($message === null) {
+            $message = 'Unable to load components: ' . $exception->getMessage();
+            $messageType = 'error';
+        }
     }
 }
 ?>
