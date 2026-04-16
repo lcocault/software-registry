@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/src/database.php';
+require_once __DIR__ . '/src/models/Dependency.php';
+require_once __DIR__ . '/src/models/Component.php';
+require_once __DIR__ . '/src/database/Connection.php';
+require_once __DIR__ . '/src/database/ComponentRepository.php';
 require_once __DIR__ . '/src/DependencyParser.php';
 
 $languages = ['Java', 'Python', 'JavaScript'];
@@ -11,7 +14,15 @@ $message = null;
 $messageType = 'success';
 $editComponent = null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$repository = null;
+try {
+    $repository = new ComponentRepository(getDatabaseConnection());
+} catch (Throwable $exception) {
+    $message = 'Unable to connect to database: ' . $exception->getMessage();
+    $messageType = 'error';
+}
+
+if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
 
     if ($action === 'delete') {
@@ -21,10 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } else {
             try {
-                $pdo = getDatabaseConnection();
-                $deleteStmt = $pdo->prepare('DELETE FROM components WHERE id = :id');
-                $deleteStmt->execute(['id' => $componentId]);
-                if ($deleteStmt->rowCount() === 0) {
+                if (!$repository->delete($componentId)) {
                     $message = 'Component not found.';
                     $messageType = 'error';
                 } else {
@@ -49,84 +57,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } else {
             try {
-                $pdo = getDatabaseConnection();
-                $pdo->beginTransaction();
+                $dependencies = null;
+                $dependenciesImported = null;
+                $upload = $_FILES['dependencies_file'] ?? null;
+                if ($upload && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                    $size = (int) ($upload['size'] ?? 0);
+                    if ($size > $maxDependencyImportFileSize) {
+                        throw new RuntimeException('Dependency file is too large (max 2 MB).');
+                    }
 
-                $projectStmt = $pdo->prepare(
-                    'INSERT INTO projects(name) VALUES(:name) ON CONFLICT(name) DO UPDATE SET name = EXCLUDED.name RETURNING id'
-                );
-                $projectStmt->execute(['name' => $project]);
-                $projectId = (int) $projectStmt->fetchColumn();
+                    $content = file_get_contents($upload['tmp_name']);
+                    $parsed = [];
+                    if ($content !== false && strlen($content) <= $maxDependencyImportFileSize) {
+                        $parsed = DependencyParser::parse($language, $content);
+                    }
 
-                $updateStmt = $pdo->prepare(
-                    'UPDATE components SET name = :name, version = :version, owner = :owner, language = :language, project_id = :project_id WHERE id = :id'
-                );
-                $updateStmt->execute([
-                    'name' => $name,
-                    'version' => $version,
-                    'owner' => $owner,
-                    'language' => $language,
-                    'project_id' => $projectId,
-                    'id' => $componentId,
-                ]);
+                    $dependencies = array_values(array_filter(
+                        $parsed,
+                        static fn (array $d): bool => strlen($d['name']) <= 255 && strlen($d['version']) <= 100,
+                    ));
+                    $dependenciesImported = count($dependencies);
+                }
 
-                if ($updateStmt->rowCount() === 0) {
-                    $pdo->rollBack();
+                if (!$repository->update($componentId, $name, $version, $owner, $project, $language, $dependencies)) {
                     $message = 'Component not found.';
                     $messageType = 'error';
                 } else {
-                    $upload = $_FILES['dependencies_file'] ?? null;
-                    $dependenciesImported = null;
-                    if ($upload && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-                        $size = (int) ($upload['size'] ?? 0);
-                        if ($size > $maxDependencyImportFileSize) {
-                            throw new RuntimeException('Dependency file is too large (max 2 MB).');
-                        }
-
-                        $content = file_get_contents($upload['tmp_name']);
-                        $dependencies = [];
-                        if ($content !== false && strlen($content) <= $maxDependencyImportFileSize) {
-                            $dependencies = DependencyParser::parse($language, $content);
-                        }
-
-                        $deleteDepStmt = $pdo->prepare('DELETE FROM dependencies WHERE component_id = :component_id');
-                        $deleteDepStmt->execute(['component_id' => $componentId]);
-
-                        if ($dependencies !== []) {
-                            $valueClauses = [];
-                            $insertParams = [];
-                            $validDependencies = [];
-
-                            foreach ($dependencies as $dependency) {
-                                if (
-                                    strlen($dependency['name']) <= 255 &&
-                                    strlen($dependency['version']) <= 100
-                                ) {
-                                    $validDependencies[] = $dependency;
-                                }
-                            }
-
-                            foreach ($validDependencies as $index => $dependency) {
-                                $valueClauses[] = '(:component_id_' . $index . ', :name_' . $index . ', :version_' . $index . ')';
-                                $insertParams['component_id_' . $index] = $componentId;
-                                $insertParams['name_' . $index] = $dependency['name'];
-                                $insertParams['version_' . $index] = $dependency['version'];
-                            }
-
-                            if ($valueClauses !== []) {
-                                $dependencyStmt = $pdo->prepare(
-                                    'INSERT INTO dependencies(component_id, name, version) VALUES ' . implode(', ', $valueClauses)
-                                );
-                                $dependencyStmt->execute($insertParams);
-                            }
-
-                            $dependenciesImported = count($validDependencies);
-                        } else {
-                            $dependenciesImported = 0;
-                        }
-                    }
-
-                    $pdo->commit();
                     if ($dependenciesImported !== null) {
                         $message = sprintf('Component updated successfully (%d dependencies imported).', $dependenciesImported);
                     } else {
@@ -135,10 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'success';
                 }
             } catch (Throwable $exception) {
-                if (isset($pdo) && $pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-
                 $message = 'Unable to update component: ' . $exception->getMessage();
                 $messageType = 'error';
             }
@@ -155,27 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } else {
             try {
-                $pdo = getDatabaseConnection();
-                $pdo->beginTransaction();
-
-                $projectStmt = $pdo->prepare(
-                    'INSERT INTO projects(name) VALUES(:name) ON CONFLICT(name) DO UPDATE SET name = EXCLUDED.name RETURNING id'
-                );
-                $projectStmt->execute(['name' => $project]);
-                $projectId = (int) $projectStmt->fetchColumn();
-
-                $componentStmt = $pdo->prepare(
-                    'INSERT INTO components(name, version, owner, language, project_id) VALUES(:name, :version, :owner, :language, :project_id) RETURNING id'
-                );
-                $componentStmt->execute([
-                    'name' => $name,
-                    'version' => $version,
-                    'owner' => $owner,
-                    'language' => $language,
-                    'project_id' => $projectId,
-                ]);
-                $componentId = (int) $componentStmt->fetchColumn();
-
                 $dependencies = [];
                 $upload = $_FILES['dependencies_file'] ?? null;
                 if ($upload && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
@@ -186,49 +117,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $content = file_get_contents($upload['tmp_name']);
                     if ($content !== false && strlen($content) <= $maxDependencyImportFileSize) {
-                        $dependencies = DependencyParser::parse($language, $content);
+                        $parsed = DependencyParser::parse($language, $content);
+                        $dependencies = array_values(array_filter(
+                            $parsed,
+                            static fn (array $d): bool => strlen($d['name']) <= 255 && strlen($d['version']) <= 100,
+                        ));
                     }
                 }
 
-                if ($dependencies !== []) {
-                    $valueClauses = [];
-                    $insertParams = [];
-                    $validDependencies = [];
-
-                    foreach ($dependencies as $dependency) {
-                        if (
-                            strlen($dependency['name']) <= 255 &&
-                            strlen($dependency['version']) <= 100
-                        ) {
-                            $validDependencies[] = $dependency;
-                        }
-                    }
-
-                    foreach ($validDependencies as $index => $dependency) {
-                        $valueClauses[] = '(:component_id_' . $index . ', :name_' . $index . ', :version_' . $index . ')';
-                        $insertParams['component_id_' . $index] = $componentId;
-                        $insertParams['name_' . $index] = $dependency['name'];
-                        $insertParams['version_' . $index] = $dependency['version'];
-                    }
-
-                    if ($valueClauses !== []) {
-                        $dependencyStmt = $pdo->prepare(
-                            'INSERT INTO dependencies(component_id, name, version) VALUES ' . implode(', ', $valueClauses)
-                        );
-                        $dependencyStmt->execute($insertParams);
-                    }
-
-                    $dependencies = $validDependencies;
-                }
-
-                $pdo->commit();
+                $repository->save($name, $version, $owner, $project, $language, $dependencies);
                 $message = sprintf('Component saved successfully (%d dependencies imported).', count($dependencies));
                 $messageType = 'success';
             } catch (Throwable $exception) {
-                if (isset($pdo) && $pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-
                 $message = 'Unable to save component: ' . $exception->getMessage();
                 $messageType = 'error';
             }
@@ -236,20 +136,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['edit'])) {
+if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['edit'])) {
     $editId = (int) $_GET['edit'];
     if ($editId > 0) {
         try {
-            $pdo = getDatabaseConnection();
-            $editStmt = $pdo->prepare(
-                'SELECT c.id, c.name, c.version, c.owner, c.language, p.name AS project_name
-                 FROM components c
-                 JOIN projects p ON p.id = c.project_id
-                 WHERE c.id = :id'
-            );
-            $editStmt->execute(['id' => $editId]);
-            $editComponent = $editStmt->fetch();
-            if (!$editComponent) {
+            $editComponent = $repository->findById($editId);
+            if ($editComponent === null) {
                 $message = 'Component not found.';
                 $messageType = 'error';
             }
@@ -260,46 +152,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['edit'])) {
     }
 }
 
-try {
-    $pdo = getDatabaseConnection();
-    $components = $pdo->query(
-        'SELECT c.id, c.name, c.version, c.owner, c.language, p.name AS project_name
-         FROM components c
-         JOIN projects p ON p.id = c.project_id
-         ORDER BY c.id DESC
-         LIMIT 200'
-    )->fetchAll();
-    $dependenciesByComponent = [];
-    if ($components !== []) {
-        $componentIds = array_map(static fn (array $component): int => (int) $component['id'], $components);
-        $placeholderTokens = array_map(static fn (int $index): string => ':id_' . $index, array_keys($componentIds));
-        $dependencyStmt = $pdo->prepare(
-            'SELECT component_id, name, version
-             FROM dependencies
-             WHERE component_id IN (' . implode(', ', $placeholderTokens) . ')
-             ORDER BY name'
-        );
-
-        $dependencyParams = [];
-        foreach ($componentIds as $index => $componentId) {
-            $dependencyParams['id_' . $index] = $componentId;
+$components = [];
+if ($repository !== null) {
+    try {
+        $components = $repository->listAll();
+    } catch (Throwable $exception) {
+        if ($message === null) {
+            $message = 'Unable to load components: ' . $exception->getMessage();
+            $messageType = 'error';
         }
-        $dependencyStmt->execute($dependencyParams);
-
-        foreach ($dependencyStmt->fetchAll() as $dependencyRow) {
-            $componentId = (int) $dependencyRow['component_id'];
-            $dependenciesByComponent[$componentId][] = [
-                'name' => $dependencyRow['name'],
-                'version' => $dependencyRow['version'],
-            ];
-        }
-    }
-} catch (Throwable $exception) {
-    $components = [];
-    $dependenciesByComponent = [];
-    if ($message === null) {
-        $message = 'Unable to connect to database: ' . $exception->getMessage();
-        $messageType = 'error';
     }
 }
 ?>
@@ -339,95 +200,7 @@ try {
         </div>
     <?php endif; ?>
 
-    <form method="post" enctype="multipart/form-data">
-        <?php if ($editComponent !== null): ?>
-            <input type="hidden" name="action" value="update">
-            <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $editComponent['id'], ENT_QUOTES, 'UTF-8') ?>">
-        <?php endif; ?>
-        <label>
-            Name
-            <input type="text" name="name" required value="<?= htmlspecialchars($editComponent['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-        </label>
-        <label>
-            Version
-            <input type="text" name="version" required value="<?= htmlspecialchars($editComponent['version'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-        </label>
-        <label>
-            Owner
-            <input type="text" name="owner" required value="<?= htmlspecialchars($editComponent['owner'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-        </label>
-        <label>
-            Project
-            <input type="text" name="project" required value="<?= htmlspecialchars($editComponent['project_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-        </label>
-        <label>
-            Language
-            <select name="language" required>
-                <?php foreach ($languages as $language): ?>
-                    <option value="<?= htmlspecialchars($language, ENT_QUOTES, 'UTF-8') ?>"<?= ($editComponent !== null && $editComponent['language'] === $language) ? ' selected' : '' ?>><?= htmlspecialchars($language, ENT_QUOTES, 'UTF-8') ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <label>
-            Dependency file (<?= $editComponent !== null ? 'optional, replaces existing dependencies' : 'optional' ?>)
-            <input type="file" name="dependencies_file">
-        </label>
-        <div class="form-actions">
-            <button type="submit"><?= $editComponent !== null ? 'Update component' : 'Register component' ?></button>
-            <?php if ($editComponent !== null): ?>
-                <a href="." class="btn-cancel">Cancel</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
-    <h2>Registered components</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Version</th>
-                <th>Owner</th>
-                <th>Project</th>
-                <th>Language</th>
-                <th>Dependencies</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php if ($components === []): ?>
-            <tr><td colspan="7">No components registered yet.</td></tr>
-        <?php else: ?>
-            <?php foreach ($components as $component): ?>
-                <tr>
-                    <td><?= htmlspecialchars($component['name'], ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars($component['version'], ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars($component['owner'], ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars($component['project_name'], ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars($component['language'], ENT_QUOTES, 'UTF-8') ?></td>
-                    <td>
-                        <?php $dependencies = $dependenciesByComponent[(int) $component['id']] ?? []; ?>
-                        <?php if ($dependencies === []): ?>
-                            No dependencies.
-                        <?php else: ?>
-                            <ul>
-                                <?php foreach ($dependencies as $dependency): ?>
-                                    <li><?= htmlspecialchars($dependency['name'], ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars($dependency['version'], ENT_QUOTES, 'UTF-8') ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <a href="?edit=<?= htmlspecialchars((string) $component['id'], ENT_QUOTES, 'UTF-8') ?>" class="btn-edit">Edit</a>
-                        <form method="post" style="display:inline; margin-top:4px;">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component['id'], ENT_QUOTES, 'UTF-8') ?>">
-                            <button type="submit" class="btn-delete" onclick="return confirm('Delete this component?')">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-        <?php endif; ?>
-        </tbody>
-    </table>
+    <?php include __DIR__ . '/src/views/form.php'; ?>
+    <?php include __DIR__ . '/src/views/list.php'; ?>
 </body>
 </html>
