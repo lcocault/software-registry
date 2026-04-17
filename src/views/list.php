@@ -42,14 +42,12 @@ $langIcons = [
                                 </span>
                             </td>
                             <td>
-                                <?php if ($component->dependencies === []): ?>
+                                <?php $depCount = count($component->dependencies); ?>
+                                <?php if ($depCount === 0): ?>
                                     <span class="no-deps">None</span>
                                 <?php else: ?>
-                                    <ul>
-                                        <?php foreach ($component->dependencies as $dependency): ?>
-                                            <li><?= htmlspecialchars($dependency->name, ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars($dependency->version, ENT_QUOTES, 'UTF-8') ?></li>
-                                        <?php endforeach; ?>
-                                    </ul>
+                                    <span class="dep-count"><?= $depCount ?></span>
+                                    <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-view"><i class="fas fa-eye"></i> View</a>
                                 <?php endif; ?>
                             </td>
                             <td class="actions">
