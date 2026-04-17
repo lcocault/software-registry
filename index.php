@@ -16,6 +16,11 @@ $message = null;
 $messageType = 'success';
 $editComponent = null;
 $editUser = null;
+$catalogDeps = null;
+$catalogDepName = null;
+$catalogVersions = null;
+$catalogDepVersion = null;
+$catalogUsing = null;
 
 $repository = null;
 $userRepository = null;
@@ -251,8 +256,29 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
     }
 }
 
+$showCatalogSection = isset($_GET['action']) && $_GET['action'] === 'catalog';
+
+if ($repository !== null && $showCatalogSection && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $catalogDepName    = isset($_GET['catalog_dep']) ? trim($_GET['catalog_dep']) : null;
+    $catalogDepVersion = isset($_GET['catalog_version']) ? trim($_GET['catalog_version']) : null;
+
+    try {
+        if ($catalogDepName !== null && $catalogDepName !== '' && $catalogDepVersion !== null && $catalogDepVersion !== '') {
+            $catalogUsing = $repository->listComponentsUsingDependency($catalogDepName, $catalogDepVersion);
+        } elseif ($catalogDepName !== null && $catalogDepName !== '') {
+            $catalogVersions = $repository->listDependencyVersions($catalogDepName);
+        } else {
+            $catalogDepName = null;
+            $catalogDeps    = $repository->listDependencyNames();
+        }
+    } catch (Throwable $exception) {
+        $message = 'Unable to load catalog: ' . $exception->getMessage();
+        $messageType = 'error';
+    }
+}
+
 $components = [];
-if ($repository !== null && $viewDepsComponent === null) {
+if ($repository !== null && $viewDepsComponent === null && !$showCatalogSection) {
     try {
         $components = $repository->listAll();
     } catch (Throwable $exception) {
@@ -724,6 +750,13 @@ $showForm = $editComponent !== null
         }
         .btn-view:hover { background: var(--btn-edit-hover); }
 
+        .catalog-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .catalog-link:hover { text-decoration: underline; }
+
         .deps-component-info {
             display: flex;
             align-items: center;
@@ -793,7 +826,8 @@ $showForm = $editComponent !== null
 
     <main>
         <nav class="nav-bar">
-            <a href="." class="<?= !$showUsersSection ? 'active' : '' ?>"><i class="fas fa-cubes"></i> Components</a>
+            <a href="." class="<?= !$showUsersSection && !$showCatalogSection ? 'active' : '' ?>"><i class="fas fa-cubes"></i> Components</a>
+            <a href="?action=catalog" class="<?= $showCatalogSection ? 'active' : '' ?>"><i class="fas fa-book"></i> Catalog</a>
             <a href="?action=users" class="<?= $showUsersSection ? 'active' : '' ?>"><i class="fas fa-users"></i> Users</a>
         </nav>
 
@@ -827,6 +861,18 @@ $showForm = $editComponent !== null
 
         <div class="card">
             <?php include __DIR__ . '/src/views/users.php'; ?>
+        </div>
+
+        <?php elseif ($showCatalogSection): ?>
+
+        <div class="card">
+            <?php if ($catalogUsing !== null): ?>
+                <?php include __DIR__ . '/src/views/catalog_using.php'; ?>
+            <?php elseif ($catalogVersions !== null): ?>
+                <?php include __DIR__ . '/src/views/catalog_versions.php'; ?>
+            <?php else: ?>
+                <?php include __DIR__ . '/src/views/catalog.php'; ?>
+            <?php endif; ?>
         </div>
 
         <?php else: ?>
