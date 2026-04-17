@@ -218,6 +218,85 @@ final class ComponentRepository
         );
     }
 
+    /**
+     * @return array<array{name: string, usage_count: int}>
+     */
+    public function listDependencyNames(): array
+    {
+        $rows = $this->pdo->query(
+            'SELECT d.name, COUNT(DISTINCT vd.component_id) AS usage_count
+             FROM dependencies d
+             JOIN versioned_dependencies vd ON vd.dependency_id = d.id
+             GROUP BY d.id, d.name
+             ORDER BY d.name'
+        )->fetchAll();
+
+        return array_map(
+            static fn (array $row): array => [
+                'name'        => $row['name'],
+                'usage_count' => (int) $row['usage_count'],
+            ],
+            $rows,
+        );
+    }
+
+    /**
+     * @return array<array{version: string, usage_count: int}>
+     */
+    public function listDependencyVersions(string $name): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT vd.version, COUNT(DISTINCT vd.component_id) AS usage_count
+             FROM versioned_dependencies vd
+             JOIN dependencies d ON d.id = vd.dependency_id
+             WHERE d.name = :name
+             GROUP BY vd.version
+             ORDER BY vd.version'
+        );
+        $stmt->execute(['name' => $name]);
+
+        return array_map(
+            static fn (array $row): array => [
+                'version'     => $row['version'],
+                'usage_count' => (int) $row['usage_count'],
+            ],
+            $stmt->fetchAll(),
+        );
+    }
+
+    /**
+     * @return Component[]
+     */
+    public function listComponentsUsingDependency(string $name, string $version): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT c.id, c.name, c.version, c.owner_id,
+                    u.firstname || \' \' || u.name AS owner_name,
+                    c.language, p.name AS project_name
+             FROM components c
+             JOIN projects p ON p.id = c.project_id
+             JOIN users u ON u.id = c.owner_id
+             JOIN versioned_dependencies vd ON vd.component_id = c.id
+             JOIN dependencies d ON d.id = vd.dependency_id
+             WHERE d.name = :name AND vd.version = :version
+             ORDER BY c.name, c.version'
+        );
+        $stmt->execute(['name' => $name, 'version' => $version]);
+
+        return array_map(
+            static fn (array $row): Component => new Component(
+                (int) $row['id'],
+                $row['name'],
+                $row['version'],
+                (int) $row['owner_id'],
+                $row['owner_name'],
+                $row['language'],
+                $row['project_name'],
+            ),
+            $stmt->fetchAll(),
+        );
+    }
+
     private function upsertProject(string $name): int
     {
         $stmt = $this->pdo->prepare(
