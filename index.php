@@ -5,10 +5,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/src/models/Dependency.php';
 require_once __DIR__ . '/src/models/Component.php';
 require_once __DIR__ . '/src/models/User.php';
+require_once __DIR__ . '/src/models/Cve.php';
 require_once __DIR__ . '/src/database/Connection.php';
 require_once __DIR__ . '/src/database/ComponentRepository.php';
 require_once __DIR__ . '/src/database/UserRepository.php';
+require_once __DIR__ . '/src/database/CveRepository.php';
 require_once __DIR__ . '/src/DependencyParser.php';
+require_once __DIR__ . '/src/OsvClient.php';
 
 $languages = ['Java', 'Python', 'JavaScript'];
 $maxDependencyImportFileSize = 2 * 1024 * 1024;
@@ -21,13 +24,16 @@ $catalogDepName = null;
 $catalogVersions = null;
 $catalogDepVersion = null;
 $catalogUsing = null;
+$catalogCves = null;
 
 $repository = null;
 $userRepository = null;
+$cveRepository = null;
 try {
     $pdo = getDatabaseConnection();
     $repository = new ComponentRepository($pdo);
     $userRepository = new UserRepository($pdo);
+    $cveRepository = new CveRepository($pdo);
 } catch (Throwable $exception) {
     $message = 'Unable to connect to database: ' . $exception->getMessage();
     $messageType = 'error';
@@ -166,6 +172,28 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'refresh_cves' && $cveRepository !== null) {
+        $depName     = trim($_POST['dep_name'] ?? '');
+        $depVersion  = trim($_POST['dep_version'] ?? '');
+        $depLanguage = trim($_POST['dep_language'] ?? '');
+
+        if ($depName === '' || $depVersion === '' || $depLanguage === '') {
+            $message = 'Invalid dependency information for CVE refresh.';
+            $messageType = 'error';
+        } else {
+            try {
+                $freshCves = (new OsvClient())->getVulnerabilities($depName, $depVersion, $depLanguage);
+                $cveRepository->store($depName, $depVersion, $freshCves);
+                header(
+                    'Location: ?action=catalog&catalog_dep=' . urlencode($depName)
+                    . '&catalog_version=' . urlencode($depVersion)
+                );
+                exit;
+            } catch (Throwable $exception) {
+                $message = 'Unable to refresh CVE data: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
     } else {
         $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
@@ -265,6 +293,28 @@ if ($repository !== null && $showCatalogSection && $_SERVER['REQUEST_METHOD'] ==
     try {
         if ($catalogDepName !== null && $catalogDepName !== '' && $catalogDepVersion !== null && $catalogDepVersion !== '') {
             $catalogUsing = $repository->listComponentsUsingDependency($catalogDepName, $catalogDepVersion);
+
+            // Load CVEs from the database; only call the OSV API if they have never been fetched.
+            // CVE lookup uses the language of the first component as the OSV ecosystem.
+            // All components sharing the same dependency are expected to use the same language.
+            if ($cveRepository !== null) {
+                $catalogCves = $cveRepository->findByDependency($catalogDepName, $catalogDepVersion);
+                if ($catalogCves === null) {
+                    $language = $catalogUsing !== [] ? $catalogUsing[0]->language : '';
+                    if ($language !== '') {
+                        try {
+                            $catalogCves = (new OsvClient())->getVulnerabilities($catalogDepName, $catalogDepVersion, $language);
+                            $cveRepository->store($catalogDepName, $catalogDepVersion, $catalogCves);
+                        } catch (Throwable) {
+                            $catalogCves = [];
+                        }
+                    } else {
+                        $catalogCves = [];
+                    }
+                }
+            } else {
+                $catalogCves = [];
+            }
         } elseif ($catalogDepName !== null && $catalogDepName !== '') {
             $catalogVersions = $repository->listDependencyVersions($catalogDepName);
         } else {
@@ -310,7 +360,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user'], true)
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves'], true)
     && $messageType === 'error';
 
 $showUserForm = $editUser !== null
@@ -813,6 +863,86 @@ $showForm = $editComponent !== null
         }
         .nav-bar a:hover { background: var(--tr-hover); border-color: var(--accent); }
         .nav-bar a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        /* ── CVE / Vulnerability styles ────────────────────────────────── */
+        .cve-section { margin-top: 28px; }
+
+        .cve-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .cve-section-title {
+            font-size: 1em;
+            font-weight: 700;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: var(--text-primary);
+        }
+
+        .cve-none {
+            color: var(--text-secondary);
+            font-size: .9em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cve-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+
+        .cve-item {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            background: var(--bg-card);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .cve-id {
+            font-weight: 700;
+            font-size: .9em;
+            white-space: nowrap;
+            font-family: monospace;
+            color: var(--text-primary);
+        }
+
+        .cve-description {
+            flex: 1;
+            font-size: .9em;
+            color: var(--text-secondary);
+            min-width: 0;
+        }
+
+        .cve-severity {
+            font-size: .78em;
+            font-weight: 700;
+            border-radius: 4px;
+            padding: 2px 8px;
+            white-space: nowrap;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .cve-severity-CRITICAL { background: #ffe4e4; color: #9b2c2c; border: 1px solid #fc8181; }
+        .cve-severity-HIGH     { background: #fff3e0; color: #7b4f0e; border: 1px solid #f6ad55; }
+        .cve-severity-MEDIUM   { background: #fffde7; color: #744210; border: 1px solid #f6e05e; }
+        .cve-severity-LOW      { background: #e8f5e9; color: #1b5e20; border: 1px solid #68d391; }
+        .cve-severity-UNKNOWN  { background: var(--tr-stripe); color: var(--text-secondary); border: 1px solid var(--border-color); }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) .cve-severity-CRITICAL { background: #3d0e0e; color: #f87171; border-color: #7f1d1d; }
+            :root:not([data-theme="light"]) .cve-severity-HIGH     { background: #3d2000; color: #fbbf24; border-color: #92400e; }
+            :root:not([data-theme="light"]) .cve-severity-MEDIUM   { background: #3d3000; color: #fde68a; border-color: #92400e; }
+            :root:not([data-theme="light"]) .cve-severity-LOW      { background: #0d2a17; color: #6ee7b7; border-color: #065f46; }
+        }
     </style>
 </head>
 <body>
