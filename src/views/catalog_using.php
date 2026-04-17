@@ -3,6 +3,7 @@
 //   $catalogDepName     (string)      - the dependency name
 //   $catalogDepVersion  (string)      - the version being viewed
 //   $catalogUsing       (Component[]) - components that use this dependency version
+//   $catalogCves        (Cve[])       - known CVEs for this dependency version
 
 $langIcons = [
     'Java'       => 'fab fa-java',
@@ -61,3 +62,29 @@ $langIcons = [
         </div>
         <p class="deps-footer"><?= count($catalogUsing) ?> <?= count($catalogUsing) === 1 ? 'component' : 'components' ?></p>
     <?php endif; ?>
+
+    <div class="cve-section">
+        <p class="cve-section-title"><i class="fas fa-shield-halved"></i> Known vulnerabilities (CVE)</p>
+        <?php if ($catalogCves === null || $catalogCves === []): ?>
+            <p class="cve-none"><i class="fas fa-circle-check"></i> No known vulnerabilities found for this version.</p>
+        <?php else: ?>
+            <?php $knownSeverities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']; ?>
+            <ul class="cve-list">
+                <?php foreach ($catalogCves as $cve): ?>
+                    <li class="cve-item">
+                        <span class="cve-id"><?= htmlspecialchars($cve->id, ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php if ($cve->severity !== ''): ?>
+                            <?php $severityClass = in_array($cve->severity, $knownSeverities, true) ? $cve->severity : 'UNKNOWN'; ?>
+                            <span class="cve-severity cve-severity-<?= htmlspecialchars($severityClass, ENT_QUOTES, 'UTF-8') ?>">
+                                <?= htmlspecialchars($cve->severity, ENT_QUOTES, 'UTF-8') ?>
+                            </span>
+                        <?php endif; ?>
+                        <?php if ($cve->description !== ''): ?>
+                            <span class="cve-description"><?= htmlspecialchars($cve->description, ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </div>
+
