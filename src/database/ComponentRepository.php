@@ -152,7 +152,7 @@ final class ComponentRepository
             }
 
             if ($dependencies !== null) {
-                $deleteStmt = $this->pdo->prepare('DELETE FROM dependencies WHERE component_id = :component_id');
+                $deleteStmt = $this->pdo->prepare('DELETE FROM versioned_dependencies WHERE component_id = :component_id');
                 $deleteStmt->execute(['component_id' => $id]);
 
                 if ($dependencies !== []) {
@@ -225,20 +225,27 @@ final class ComponentRepository
      */
     private function insertDependencies(int $componentId, array $dependencies): void
     {
-        $valueClauses = [];
-        $insertParams = [];
+        foreach ($dependencies as $dependency) {
+            $stmt = $this->pdo->prepare(
+                'INSERT INTO dependencies(name) VALUES(:name)
+                 ON CONFLICT(name) DO UPDATE SET name = EXCLUDED.name
+                 RETURNING id'
+            );
+            $stmt->execute(['name' => $dependency['name']]);
+            $dependencyId = (int) $stmt->fetchColumn();
+            $stmt->closeCursor();
 
-        foreach ($dependencies as $index => $dependency) {
-            $valueClauses[] = '(:component_id_' . $index . ', :name_' . $index . ', :version_' . $index . ')';
-            $insertParams['component_id_' . $index] = $componentId;
-            $insertParams['name_' . $index] = $dependency['name'];
-            $insertParams['version_' . $index] = $dependency['version'];
+            $stmt = $this->pdo->prepare(
+                'INSERT INTO versioned_dependencies(component_id, dependency_id, version)
+                 VALUES(:component_id, :dependency_id, :version)
+                 ON CONFLICT(component_id, dependency_id) DO UPDATE SET version = EXCLUDED.version'
+            );
+            $stmt->execute([
+                'component_id' => $componentId,
+                'dependency_id' => $dependencyId,
+                'version' => $dependency['version'],
+            ]);
         }
-
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO dependencies(component_id, name, version) VALUES ' . implode(', ', $valueClauses)
-        );
-        $stmt->execute($insertParams);
     }
 
     /**
@@ -252,10 +259,11 @@ final class ComponentRepository
             array_keys($componentIds),
         );
         $stmt = $this->pdo->prepare(
-            'SELECT component_id, name, version
-             FROM dependencies
-             WHERE component_id IN (' . implode(', ', $placeholderTokens) . ')
-             ORDER BY name'
+            'SELECT vd.component_id, d.name, vd.version
+             FROM versioned_dependencies vd
+             JOIN dependencies d ON d.id = vd.dependency_id
+             WHERE vd.component_id IN (' . implode(', ', $placeholderTokens) . ')
+             ORDER BY d.name'
         );
 
         $params = [];
