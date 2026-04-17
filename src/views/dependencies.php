@@ -36,8 +36,16 @@ $langIcons = [
                 <tbody>
                     <?php foreach ($component->dependencies as $dependency): ?>
                         <tr>
-                            <td><?= htmlspecialchars($dependency->name, ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars($dependency->version, ENT_QUOTES, 'UTF-8') ?></td>
+                            <td>
+                                <a href="?action=catalog&amp;catalog_dep=<?= urlencode($dependency->name) ?>" class="catalog-link">
+                                    <?= htmlspecialchars($dependency->name, ENT_QUOTES, 'UTF-8') ?>
+                                </a>
+                            </td>
+                            <td>
+                                <a href="?action=catalog&amp;catalog_dep=<?= urlencode($dependency->name) ?>&amp;catalog_version=<?= urlencode($dependency->version) ?>" class="catalog-link">
+                                    <?= htmlspecialchars($dependency->version, ENT_QUOTES, 'UTF-8') ?>
+                                </a>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

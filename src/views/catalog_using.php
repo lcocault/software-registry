@@ -36,8 +36,16 @@ $langIcons = [
                 <tbody>
                     <?php foreach ($catalogUsing as $component): ?>
                         <tr>
-                            <td><?= htmlspecialchars($component->name, ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars($component->version, ENT_QUOTES, 'UTF-8') ?></td>
+                            <td>
+                                <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="catalog-link">
+                                    <?= htmlspecialchars($component->name, ENT_QUOTES, 'UTF-8') ?>
+                                </a>
+                            </td>
+                            <td>
+                                <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="catalog-link">
+                                    <?= htmlspecialchars($component->version, ENT_QUOTES, 'UTF-8') ?>
+                                </a>
+                            </td>
                             <td><?= htmlspecialchars($component->owner, ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($component->projectName, ENT_QUOTES, 'UTF-8') ?></td>
                             <td>
