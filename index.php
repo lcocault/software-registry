@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/src/models/Dependency.php';
 require_once __DIR__ . '/src/models/Component.php';
+require_once __DIR__ . '/src/models/User.php';
 require_once __DIR__ . '/src/database/Connection.php';
 require_once __DIR__ . '/src/database/ComponentRepository.php';
+require_once __DIR__ . '/src/database/UserRepository.php';
 require_once __DIR__ . '/src/DependencyParser.php';
 
 $languages = ['Java', 'Python', 'JavaScript'];
@@ -13,16 +15,20 @@ $maxDependencyImportFileSize = 2 * 1024 * 1024;
 $message = null;
 $messageType = 'success';
 $editComponent = null;
+$editUser = null;
 
 $repository = null;
+$userRepository = null;
 try {
-    $repository = new ComponentRepository(getDatabaseConnection());
+    $pdo = getDatabaseConnection();
+    $repository = new ComponentRepository($pdo);
+    $userRepository = new UserRepository($pdo);
 } catch (Throwable $exception) {
     $message = 'Unable to connect to database: ' . $exception->getMessage();
     $messageType = 'error';
 }
 
-if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
 
     if ($action === 'delete') {
@@ -44,15 +50,75 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'delete_user') {
+        $userId = (int) ($_POST['user_id'] ?? 0);
+        if ($userId <= 0) {
+            $message = 'Invalid user ID.';
+            $messageType = 'error';
+        } else {
+            try {
+                if (!$userRepository->delete($userId)) {
+                    $message = 'User not found.';
+                    $messageType = 'error';
+                } else {
+                    $message = 'User deleted successfully.';
+                    $messageType = 'success';
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to delete user: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
+    } elseif ($action === 'create_user') {
+        $firstname = trim($_POST['firstname'] ?? '');
+        $name      = trim($_POST['name'] ?? '');
+        $email     = trim($_POST['email'] ?? '');
+
+        if ($firstname === '' || $name === '' || $email === '') {
+            $message = 'All user fields are required.';
+            $messageType = 'error';
+        } else {
+            try {
+                $userRepository->save($firstname, $name, $email);
+                $message = 'User added successfully.';
+                $messageType = 'success';
+            } catch (Throwable $exception) {
+                $message = 'Unable to add user: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
+    } elseif ($action === 'update_user') {
+        $userId    = (int) ($_POST['user_id'] ?? 0);
+        $firstname = trim($_POST['firstname'] ?? '');
+        $name      = trim($_POST['name'] ?? '');
+        $email     = trim($_POST['email'] ?? '');
+
+        if ($userId <= 0 || $firstname === '' || $name === '' || $email === '') {
+            $message = 'All user fields are required.';
+            $messageType = 'error';
+        } else {
+            try {
+                if (!$userRepository->update($userId, $firstname, $name, $email)) {
+                    $message = 'User not found.';
+                    $messageType = 'error';
+                } else {
+                    $message = 'User updated successfully.';
+                    $messageType = 'success';
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to update user: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
     } elseif ($action === 'update') {
         $componentId = (int) ($_POST['component_id'] ?? 0);
-        $name = trim($_POST['name'] ?? '');
+        $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
-        $owner = trim($_POST['owner'] ?? '');
+        $ownerId = (int) ($_POST['owner_id'] ?? 0);
         $project = trim($_POST['project'] ?? '');
         $language = trim($_POST['language'] ?? '');
 
-        if ($componentId <= 0 || $name === '' || $version === '' || $owner === '' || $project === '' || !in_array($language, $languages, true)) {
+        if ($componentId <= 0 || $name === '' || $version === '' || $ownerId <= 0 || $project === '' || !in_array($language, $languages, true)) {
             $message = 'All fields are required and language must be valid.';
             $messageType = 'error';
         } else {
@@ -79,7 +145,7 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $dependenciesImported = count($dependencies);
                 }
 
-                if (!$repository->update($componentId, $name, $version, $owner, $project, $language, $dependencies)) {
+                if (!$repository->update($componentId, $name, $version, $ownerId, $project, $language, $dependencies)) {
                     $message = 'Component not found.';
                     $messageType = 'error';
                 } else {
@@ -96,13 +162,13 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } else {
-        $name = trim($_POST['name'] ?? '');
+        $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
-        $owner = trim($_POST['owner'] ?? '');
+        $ownerId = (int) ($_POST['owner_id'] ?? 0);
         $project = trim($_POST['project'] ?? '');
         $language = trim($_POST['language'] ?? '');
 
-        if ($name === '' || $version === '' || $owner === '' || $project === '' || !in_array($language, $languages, true)) {
+        if ($name === '' || $version === '' || $ownerId <= 0 || $project === '' || !in_array($language, $languages, true)) {
             $message = 'All fields are required and language must be valid.';
             $messageType = 'error';
         } else {
@@ -125,13 +191,29 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $repository->save($name, $version, $owner, $project, $language, $dependencies);
+                $repository->save($name, $version, $ownerId, $project, $language, $dependencies);
                 $message = sprintf('Component saved successfully (%d dependencies imported).', count($dependencies));
                 $messageType = 'success';
             } catch (Throwable $exception) {
                 $message = 'Unable to save component: ' . $exception->getMessage();
                 $messageType = 'error';
             }
+        }
+    }
+}
+
+if ($userRepository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['edit_user'])) {
+    $editUserId = (int) $_GET['edit_user'];
+    if ($editUserId > 0) {
+        try {
+            $editUser = $userRepository->findById($editUserId);
+            if ($editUser === null) {
+                $message = 'User not found.';
+                $messageType = 'error';
+            }
+        } catch (Throwable $exception) {
+            $message = 'Unable to load user: ' . $exception->getMessage();
+            $messageType = 'error';
         }
     }
 }
@@ -181,9 +263,37 @@ if ($repository !== null && $viewDepsComponent === null) {
     }
 }
 
+$users = [];
+if ($userRepository !== null) {
+    try {
+        $users = $userRepository->listAll();
+    } catch (Throwable $exception) {
+        if ($message === null) {
+            $message = 'Unable to load users: ' . $exception->getMessage();
+            $messageType = 'error';
+        }
+    }
+}
+
+$showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
+    || (isset($_GET['action']) && $_GET['action'] === 'register_user')
+    || $editUser !== null
+    || (
+        $_SERVER['REQUEST_METHOD'] === 'POST'
+        && in_array($_POST['action'] ?? '', ['create_user', 'update_user', 'delete_user'], true)
+    );
+
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && ($_POST['action'] ?? 'create') !== 'delete'
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user'], true)
     && $messageType === 'error';
+
+$showUserForm = $editUser !== null
+    || (isset($_GET['action']) && $_GET['action'] === 'register_user')
+    || (
+        $_SERVER['REQUEST_METHOD'] === 'POST'
+        && in_array($_POST['action'] ?? '', ['create_user', 'update_user'], true)
+        && $messageType === 'error'
+    );
 
 $showForm = $editComponent !== null
     || (isset($_GET['action']) && in_array($_GET['action'], ['register'], true))
@@ -649,6 +759,27 @@ $showForm = $editComponent !== null
             margin-bottom: 20px;
         }
         .card-title-bar .card-title { margin-bottom: 0; }
+
+        .nav-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .nav-bar a {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 16px;
+            border-radius: var(--radius);
+            font-size: .9em;
+            text-decoration: none;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            transition: background .15s, border-color .15s;
+        }
+        .nav-bar a:hover { background: var(--tr-hover); border-color: var(--accent); }
+        .nav-bar a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     </style>
 </head>
 <body>
@@ -661,6 +792,11 @@ $showForm = $editComponent !== null
     </header>
 
     <main>
+        <nav class="nav-bar">
+            <a href="." class="<?= !$showUsersSection ? 'active' : '' ?>"><i class="fas fa-cubes"></i> Components</a>
+            <a href="?action=users" class="<?= $showUsersSection ? 'active' : '' ?>"><i class="fas fa-users"></i> Users</a>
+        </nav>
+
         <p class="subtitle">
             Supported dependency import formats:
             <code><i class="fab fa-java"></i> mvn dependency:tree</code>
@@ -676,6 +812,24 @@ $showForm = $editComponent !== null
                 <?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+
+        <?php if ($showUsersSection): ?>
+
+        <?php if ($showUserForm): ?>
+        <div class="card">
+            <h2 class="card-title">
+                <i class="fas <?= $editUser !== null ? 'fa-pen-to-square' : 'fa-plus-circle' ?>"></i>
+                <?= $editUser !== null ? 'Edit user' : 'Add user' ?>
+            </h2>
+            <?php include __DIR__ . '/src/views/user_form.php'; ?>
+        </div>
+        <?php endif; ?>
+
+        <div class="card">
+            <?php include __DIR__ . '/src/views/users.php'; ?>
+        </div>
+
+        <?php else: ?>
 
         <?php if ($showForm): ?>
         <div class="card">
@@ -695,6 +849,8 @@ $showForm = $editComponent !== null
         <div class="card">
             <?php include __DIR__ . '/src/views/list.php'; ?>
         </div>
+        <?php endif; ?>
+
         <?php endif; ?>
     </main>
 
