@@ -1,8 +1,8 @@
-<?php
 // Variables expected:
 //   $catalogDepName     (string)      - the dependency name
 //   $catalogDepVersion  (string)      - the version being viewed
-//   $catalogUsing       (Component[]) - components that use this dependency version
+//   $catalogUsing       (Component[]) - components that use this dependency version;
+//                                       each Component has exactly one version in versions[]
 //   $catalogCves        (Cve[])       - known CVEs for this dependency version
 
 $langIcons = [
@@ -46,7 +46,7 @@ $depLanguage = $catalogUsing !== [] ? $catalogUsing[0]->language : '';
                             </td>
                             <td>
                                 <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="catalog-link">
-                                    <?= htmlspecialchars($component->version, ENT_QUOTES, 'UTF-8') ?>
+                                    <?= htmlspecialchars($component->versions[0]->label, ENT_QUOTES, 'UTF-8') ?>
                                 </a>
                             </td>
                             <td><?= htmlspecialchars($component->owner, ENT_QUOTES, 'UTF-8') ?></td>

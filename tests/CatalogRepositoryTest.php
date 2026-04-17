@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/TestHelpers.php';
 require_once __DIR__ . '/../src/models/Dependency.php';
+require_once __DIR__ . '/../src/models/ComponentVersion.php';
 require_once __DIR__ . '/../src/models/Component.php';
 require_once __DIR__ . '/../src/models/User.php';
 require_once __DIR__ . '/../src/database/ComponentRepository.php';
@@ -33,7 +34,6 @@ function createCatalogTestPdo(): PDO
         CREATE TABLE components (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             name       TEXT NOT NULL,
-            version    TEXT NOT NULL,
             owner_id   INTEGER NOT NULL REFERENCES users(id),
             language   TEXT NOT NULL,
             project_id INTEGER NOT NULL REFERENCES projects(id),
@@ -41,15 +41,22 @@ function createCatalogTestPdo(): PDO
         );
         CREATE INDEX idx_components_project_id ON components(project_id);
         CREATE INDEX idx_components_owner_id   ON components(owner_id);
+        CREATE TABLE component_versions (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+            label        TEXT NOT NULL,
+            UNIQUE (component_id, label)
+        );
+        CREATE INDEX idx_component_versions_component_id ON component_versions(component_id);
         CREATE TABLE dependencies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL
         );
         CREATE TABLE versioned_dependencies (
-            component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+            component_version_id INTEGER NOT NULL REFERENCES component_versions(id) ON DELETE CASCADE,
             dependency_id INTEGER NOT NULL REFERENCES dependencies(id),
             version TEXT NOT NULL,
-            PRIMARY KEY (component_id, dependency_id)
+            PRIMARY KEY (component_version_id, dependency_id)
         );
         CREATE INDEX idx_versioned_dependencies_dependency_id ON versioned_dependencies(dependency_id);'
     );
@@ -181,7 +188,8 @@ $using20 = $repo->listComponentsUsingDependency('dep-x', '2.0');
 assertTestSame(1, count($using20), 'listComponentsUsingDependency() should return 1 component using dep-x:2.0.');
 assertTestSame('comp-c', $using20[0]->name, 'listComponentsUsingDependency() dep-x:2.0 should return comp-c.');
 
-// dep-x:1.0 returned components should have all Component fields populated
+// dep-x:1.0 returned components should have all Component fields populated,
+// with exactly the matching version in their versions array
 $componentA = null;
 foreach ($using as $c) {
     if ($c->name === 'comp-a') {
@@ -189,7 +197,8 @@ foreach ($using as $c) {
     }
 }
 assertTestTrue($componentA instanceof Component, 'listComponentsUsingDependency() should return Component instances.');
-assertTestSame('1.0', $componentA->version, 'Component version should be set correctly.');
+assertTestSame(1, count($componentA->versions), 'listComponentsUsingDependency() component should have exactly one version.');
+assertTestSame('1.0', $componentA->versions[0]->label, 'Component version label should be set correctly.');
 assertTestSame('Java', $componentA->language, 'Component language should be set correctly.');
 assertTestSame('proj', $componentA->projectName, 'Component projectName should be set correctly.');
 

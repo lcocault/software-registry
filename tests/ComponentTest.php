@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/TestHelpers.php';
 require_once __DIR__ . '/../src/models/Dependency.php';
+require_once __DIR__ . '/../src/models/ComponentVersion.php';
 require_once __DIR__ . '/../src/models/Component.php';
 
 // --- Dependency model ---
@@ -22,28 +23,47 @@ try {
 }
 assertTestTrue($readonlyBlocked, 'Dependency::name must be readonly.');
 
-// --- Component model (no dependencies) ---
+// --- ComponentVersion model (no dependencies) ---
 
-$component = new Component(1, 'my-lib', '1.0.0', 5, 'Alice Smith', 'Java', 'my-project');
-assertTestSame(1, $component->id, 'Component id should match.');
-assertTestSame('my-lib', $component->name, 'Component name should match.');
-assertTestSame('1.0.0', $component->version, 'Component version should match.');
-assertTestSame(5, $component->ownerId, 'Component ownerId should match.');
-assertTestSame('Alice Smith', $component->owner, 'Component owner should match.');
-assertTestSame('Java', $component->language, 'Component language should match.');
-assertTestSame('my-project', $component->projectName, 'Component projectName should match.');
-assertTestSame([], $component->dependencies, 'Component dependencies should default to empty array.');
+$ver = new ComponentVersion(10, '1.0.0');
+assertTestSame(10, $ver->id, 'ComponentVersion id should match constructor argument.');
+assertTestSame('1.0.0', $ver->label, 'ComponentVersion label should match constructor argument.');
+assertTestSame([], $ver->dependencies, 'ComponentVersion dependencies should default to empty array.');
 
-// --- Component model (with dependencies) ---
+// --- ComponentVersion model (with dependencies) ---
 
 $deps = [
     new Dependency('org.slf4j:slf4j-api', '2.0.13'),
     new Dependency('org.junit.jupiter:junit-jupiter', '5.10.2'),
 ];
-$componentWithDeps = new Component(2, 'my-app', '2.3.0', 7, 'Bob Jones', 'Java', 'my-project', $deps);
-assertTestSame($deps, $componentWithDeps->dependencies, 'Component dependencies should match constructor argument.');
-assertTestSame(2, count($componentWithDeps->dependencies), 'Component should have 2 dependencies.');
-assertTestSame('org.slf4j:slf4j-api', $componentWithDeps->dependencies[0]->name, 'First dependency name should match.');
-assertTestSame('2.0.13', $componentWithDeps->dependencies[0]->version, 'First dependency version should match.');
+$verWithDeps = new ComponentVersion(11, '2.0.0', $deps);
+assertTestSame($deps, $verWithDeps->dependencies, 'ComponentVersion dependencies should match constructor argument.');
+assertTestSame(2, count($verWithDeps->dependencies), 'ComponentVersion should have 2 dependencies.');
+assertTestSame('org.slf4j:slf4j-api', $verWithDeps->dependencies[0]->name, 'First dependency name should match.');
+assertTestSame('2.0.13', $verWithDeps->dependencies[0]->version, 'First dependency version should match.');
 
-echo "Component and Dependency model tests passed.\n";
+// --- Component model (no versions) ---
+
+$component = new Component(1, 'my-lib', 5, 'Alice Smith', 'Java', 'my-project');
+assertTestSame(1, $component->id, 'Component id should match.');
+assertTestSame('my-lib', $component->name, 'Component name should match.');
+assertTestSame(5, $component->ownerId, 'Component ownerId should match.');
+assertTestSame('Alice Smith', $component->owner, 'Component owner should match.');
+assertTestSame('Java', $component->language, 'Component language should match.');
+assertTestSame('my-project', $component->projectName, 'Component projectName should match.');
+assertTestSame([], $component->versions, 'Component versions should default to empty array.');
+
+// --- Component model (with versions) ---
+
+$versions = [
+    new ComponentVersion(10, '1.0.0'),
+    new ComponentVersion(11, '2.0.0', $deps),
+];
+$componentWithVersions = new Component(2, 'my-app', 7, 'Bob Jones', 'Java', 'my-project', $versions);
+assertTestSame($versions, $componentWithVersions->versions, 'Component versions should match constructor argument.');
+assertTestSame(2, count($componentWithVersions->versions), 'Component should have 2 versions.');
+assertTestSame('1.0.0', $componentWithVersions->versions[0]->label, 'First version label should match.');
+assertTestSame('2.0.0', $componentWithVersions->versions[1]->label, 'Second version label should match.');
+assertTestSame(2, count($componentWithVersions->versions[1]->dependencies), 'Second version should have 2 dependencies.');
+
+echo "Component, ComponentVersion, and Dependency model tests passed.\n";

@@ -15,8 +15,15 @@
                 <input id="field-name" type="text" name="name" required value="<?= htmlspecialchars($editComponent?->name ?? '', ENT_QUOTES, 'UTF-8') ?>">
             </div>
             <div class="form-group">
-                <label for="field-version"><i class="fas fa-code-branch"></i> Version</label>
-                <input id="field-version" type="text" name="version" required value="<?= htmlspecialchars($editComponent?->version ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <label for="field-version"><i class="fas fa-code-branch"></i> Version label</label>
+                <input id="field-version" type="text" name="version" required value="<?= htmlspecialchars($editComponent?->versions[0]?->label ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <?php if ($editComponent !== null && count($editComponent->versions) > 1): ?>
+                    <small class="form-hint">
+                        Existing versions:
+                        <?= htmlspecialchars(implode(', ', array_map(static fn ($v) => $v->label, $editComponent->versions)), ENT_QUOTES, 'UTF-8') ?>.
+                        Enter a version label to add or update it.
+                    </small>
+                <?php endif; ?>
             </div>
             <div class="form-group">
                 <label for="field-owner"><i class="fas fa-user"></i> Owner</label>
@@ -40,7 +47,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="field-deps"><i class="fas fa-file-import"></i> Dependency file (<?= $editComponent !== null ? 'optional, replaces existing' : 'optional' ?>)</label>
+                <label for="field-deps"><i class="fas fa-file-import"></i> Dependency file (<?= $editComponent !== null ? 'optional, replaces existing for this version' : 'optional' ?>)</label>
                 <input id="field-deps" type="file" name="dependencies_file">
             </div>
         </div>
