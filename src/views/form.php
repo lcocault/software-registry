@@ -16,7 +16,7 @@
             </div>
             <div class="form-group">
                 <label for="field-version"><i class="fas fa-code-branch"></i> Version label</label>
-                <input id="field-version" type="text" name="version" required value="<?= htmlspecialchars($editComponent?->versions[0]?->label ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <input id="field-version" type="text" name="version" required value="<?= htmlspecialchars($editComponent !== null && $editComponent->versions !== [] ? $editComponent->versions[0]->label : '', ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($editComponent !== null && count($editComponent->versions) > 1): ?>
                     <small class="form-hint">
                         Existing versions:
