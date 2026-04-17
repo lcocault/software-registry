@@ -10,6 +10,8 @@ $langIcons = [
     'Python'     => 'fab fa-python',
     'JavaScript' => 'fab fa-js',
 ];
+
+$depLanguage = $catalogUsing !== [] ? $catalogUsing[0]->language : '';
 ?>
     <div class="card-title-bar">
         <h2 class="card-title">
@@ -64,7 +66,16 @@ $langIcons = [
     <?php endif; ?>
 
     <div class="cve-section">
-        <p class="cve-section-title"><i class="fas fa-shield-halved"></i> Known vulnerabilities (CVE)</p>
+        <div class="cve-section-header">
+            <p class="cve-section-title"><i class="fas fa-shield-halved"></i> Known vulnerabilities (CVE)</p>
+            <form method="post" action="?action=catalog&amp;catalog_dep=<?= urlencode($catalogDepName) ?>&amp;catalog_version=<?= urlencode($catalogDepVersion) ?>">
+                <input type="hidden" name="action" value="refresh_cves">
+                <input type="hidden" name="dep_name" value="<?= htmlspecialchars($catalogDepName, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="dep_version" value="<?= htmlspecialchars($catalogDepVersion, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="dep_language" value="<?= htmlspecialchars($depLanguage, ENT_QUOTES, 'UTF-8') ?>">
+                <button type="submit" class="btn btn-edit"><i class="fas fa-rotate"></i> Refresh CVEs</button>
+            </form>
+        </div>
         <?php if ($catalogCves === null || $catalogCves === []): ?>
             <p class="cve-none"><i class="fas fa-circle-check"></i> No known vulnerabilities found for this version.</p>
         <?php else: ?>

@@ -9,6 +9,7 @@ require_once __DIR__ . '/src/models/Cve.php';
 require_once __DIR__ . '/src/database/Connection.php';
 require_once __DIR__ . '/src/database/ComponentRepository.php';
 require_once __DIR__ . '/src/database/UserRepository.php';
+require_once __DIR__ . '/src/database/CveRepository.php';
 require_once __DIR__ . '/src/DependencyParser.php';
 require_once __DIR__ . '/src/OsvClient.php';
 
@@ -27,10 +28,12 @@ $catalogCves = null;
 
 $repository = null;
 $userRepository = null;
+$cveRepository = null;
 try {
     $pdo = getDatabaseConnection();
     $repository = new ComponentRepository($pdo);
     $userRepository = new UserRepository($pdo);
+    $cveRepository = new CveRepository($pdo);
 } catch (Throwable $exception) {
     $message = 'Unable to connect to database: ' . $exception->getMessage();
     $messageType = 'error';
@@ -169,6 +172,28 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'refresh_cves' && $cveRepository !== null) {
+        $depName     = trim($_POST['dep_name'] ?? '');
+        $depVersion  = trim($_POST['dep_version'] ?? '');
+        $depLanguage = trim($_POST['dep_language'] ?? '');
+
+        if ($depName === '' || $depVersion === '' || $depLanguage === '') {
+            $message = 'Invalid dependency information for CVE refresh.';
+            $messageType = 'error';
+        } else {
+            try {
+                $freshCves = (new OsvClient())->getVulnerabilities($depName, $depVersion, $depLanguage);
+                $cveRepository->store($depName, $depVersion, $freshCves);
+                header(
+                    'Location: ?action=catalog&catalog_dep=' . urlencode($depName)
+                    . '&catalog_version=' . urlencode($depVersion)
+                );
+                exit;
+            } catch (Throwable $exception) {
+                $message = 'Unable to refresh CVE data: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
     } else {
         $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
@@ -269,14 +294,23 @@ if ($repository !== null && $showCatalogSection && $_SERVER['REQUEST_METHOD'] ==
         if ($catalogDepName !== null && $catalogDepName !== '' && $catalogDepVersion !== null && $catalogDepVersion !== '') {
             $catalogUsing = $repository->listComponentsUsingDependency($catalogDepName, $catalogDepVersion);
 
-            $language = $catalogUsing !== [] ? $catalogUsing[0]->language : '';
+            // Load CVEs from the database; only call the OSV API if they have never been fetched.
             // CVE lookup uses the language of the first component as the OSV ecosystem.
             // All components sharing the same dependency are expected to use the same language.
-            if ($language !== '') {
-                try {
-                    $catalogCves = (new OsvClient())->getVulnerabilities($catalogDepName, $catalogDepVersion, $language);
-                } catch (Throwable) {
-                    $catalogCves = [];
+            if ($cveRepository !== null) {
+                $catalogCves = $cveRepository->findByDependency($catalogDepName, $catalogDepVersion);
+                if ($catalogCves === null) {
+                    $language = $catalogUsing !== [] ? $catalogUsing[0]->language : '';
+                    if ($language !== '') {
+                        try {
+                            $catalogCves = (new OsvClient())->getVulnerabilities($catalogDepName, $catalogDepVersion, $language);
+                            $cveRepository->store($catalogDepName, $catalogDepVersion, $catalogCves);
+                        } catch (Throwable) {
+                            $catalogCves = [];
+                        }
+                    } else {
+                        $catalogCves = [];
+                    }
                 }
             } else {
                 $catalogCves = [];
@@ -326,7 +360,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user'], true)
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves'], true)
     && $messageType === 'error';
 
 $showUserForm = $editUser !== null
@@ -833,10 +867,19 @@ $showForm = $editComponent !== null
         /* ── CVE / Vulnerability styles ────────────────────────────────── */
         .cve-section { margin-top: 28px; }
 
+        .cve-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
         .cve-section-title {
             font-size: 1em;
             font-weight: 700;
-            margin-bottom: 12px;
+            margin-bottom: 0;
             display: flex;
             align-items: center;
             gap: 7px;
