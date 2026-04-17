@@ -67,6 +67,7 @@ final class ComponentRepository
                 'project_id' => $projectId,
             ]);
             $componentId = (int) $stmt->fetchColumn();
+            $stmt->closeCursor();
 
             if ($dependencies !== []) {
                 $this->insertDependencies($componentId, $dependencies);
@@ -185,8 +186,10 @@ final class ComponentRepository
              RETURNING id'
         );
         $stmt->execute(['name' => $name]);
+        $id = (int) $stmt->fetchColumn();
+        $stmt->closeCursor();
 
-        return (int) $stmt->fetchColumn();
+        return $id;
     }
 
     /**
