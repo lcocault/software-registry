@@ -35,11 +35,15 @@ function createTestPdo(): PDO
         CREATE INDEX idx_components_project_id ON components(project_id);
         CREATE TABLE dependencies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
-            name TEXT NOT NULL,
-            version TEXT NOT NULL
+            name TEXT UNIQUE NOT NULL
         );
-        CREATE INDEX idx_dependencies_component_id ON dependencies(component_id);'
+        CREATE TABLE versioned_dependencies (
+            component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+            dependency_id INTEGER NOT NULL REFERENCES dependencies(id),
+            version TEXT NOT NULL,
+            PRIMARY KEY (component_id, dependency_id)
+        );
+        CREATE INDEX idx_versioned_dependencies_dependency_id ON versioned_dependencies(dependency_id);'
     );
 
     return $pdo;

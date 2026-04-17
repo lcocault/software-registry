@@ -16,15 +16,10 @@ CREATE TABLE IF NOT EXISTS components (
 CREATE INDEX IF NOT EXISTS idx_components_project_id ON components(project_id);
 
 CREATE TABLE IF NOT EXISTS dependencies (
-    id   SERIAL PRIMARY KEY,
-    name VARCHAR(255) UNIQUE NOT NULL
+    id SERIAL PRIMARY KEY,
+    component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    version VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS versioned_dependencies (
-    component_id  INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
-    dependency_id INTEGER NOT NULL REFERENCES dependencies(id),
-    version       VARCHAR(100) NOT NULL,
-    PRIMARY KEY (component_id, dependency_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_versioned_dependencies_dependency_id ON versioned_dependencies(dependency_id);
+CREATE INDEX IF NOT EXISTS idx_dependencies_component_id ON dependencies(component_id);
