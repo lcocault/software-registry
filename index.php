@@ -152,8 +152,25 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
     }
 }
 
+$viewDepsComponent = null;
+if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['deps'])) {
+    $depsId = (int) $_GET['deps'];
+    if ($depsId > 0) {
+        try {
+            $viewDepsComponent = $repository->findByIdWithDependencies($depsId);
+            if ($viewDepsComponent === null) {
+                $message = 'Component not found.';
+                $messageType = 'error';
+            }
+        } catch (Throwable $exception) {
+            $message = 'Unable to load component: ' . $exception->getMessage();
+            $messageType = 'error';
+        }
+    }
+}
+
 $components = [];
-if ($repository !== null) {
+if ($repository !== null && $viewDepsComponent === null) {
     try {
         $components = $repository->listAll();
     } catch (Throwable $exception) {
@@ -578,6 +595,50 @@ $showForm = $editComponent !== null
 
         .no-deps { color: var(--text-secondary); font-style: italic; font-size: .9em; }
 
+        .dep-count {
+            display: inline-block;
+            background: var(--btn-edit-bg);
+            border: 1px solid var(--btn-edit-border);
+            color: var(--btn-edit-text);
+            border-radius: 12px;
+            padding: 1px 8px;
+            font-size: .85em;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .btn-view {
+            background: var(--btn-edit-bg);
+            border-color: var(--btn-edit-border);
+            color: var(--btn-edit-text);
+        }
+        .btn-view:hover { background: var(--btn-edit-hover); }
+
+        .deps-component-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: .95em;
+            flex-wrap: wrap;
+        }
+        .deps-component-name { font-weight: 700; font-size: 1.05em; }
+        .deps-component-version {
+            color: var(--text-secondary);
+            background: var(--tr-stripe);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1px 7px;
+            font-size: .9em;
+        }
+
+        .deps-footer {
+            color: var(--text-secondary);
+            font-size: .85em;
+            text-align: right;
+            margin-top: 8px;
+        }
+
         .actions { white-space: nowrap; }
         .actions form { display: inline; }
 
@@ -626,9 +687,15 @@ $showForm = $editComponent !== null
         </div>
         <?php endif; ?>
 
+        <?php if ($viewDepsComponent !== null): ?>
+        <div class="card">
+            <?php $component = $viewDepsComponent; include __DIR__ . '/src/views/dependencies.php'; ?>
+        </div>
+        <?php else: ?>
         <div class="card">
             <?php include __DIR__ . '/src/views/list.php'; ?>
         </div>
+        <?php endif; ?>
     </main>
 
     <script>

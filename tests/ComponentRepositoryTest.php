@@ -77,6 +77,47 @@ $notFound = $repo->findById(999);
 assertTestNull($notFound, 'findById() should return null for a non-existent ID.');
 
 // ---------------------------------------------------------------------------
+// findByIdWithDependencies() — found with dependencies
+// ---------------------------------------------------------------------------
+
+$repo = new ComponentRepository(createTestPdo());
+$deps = [
+    ['name' => 'org.slf4j:slf4j-api', 'version' => '2.0.13'],
+    ['name' => 'com.google.guava:guava', 'version' => '31.1-jre'],
+];
+$id = $repo->save('svc-with-deps', '4.0.0', 'carol', 'platform', 'Java', $deps);
+$component = $repo->findByIdWithDependencies($id);
+assertTestTrue($component instanceof Component, 'findByIdWithDependencies() should return a Component instance.');
+assertTestSame($id, $component->id, 'findByIdWithDependencies() component id should match saved id.');
+assertTestSame('svc-with-deps', $component->name, 'findByIdWithDependencies() name should match.');
+assertTestSame(2, count($component->dependencies), 'findByIdWithDependencies() should include 2 dependencies.');
+$depNames = array_map(static fn (Dependency $d): string => $d->name, $component->dependencies);
+sort($depNames);
+assertTestSame(
+    ['com.google.guava:guava', 'org.slf4j:slf4j-api'],
+    $depNames,
+    'findByIdWithDependencies() dependency names should match (sorted alphabetically).'
+);
+
+// ---------------------------------------------------------------------------
+// findByIdWithDependencies() — found with no dependencies
+// ---------------------------------------------------------------------------
+
+$repo = new ComponentRepository(createTestPdo());
+$id = $repo->save('svc-no-deps', '1.0.0', 'dave', 'project', 'Python', []);
+$component = $repo->findByIdWithDependencies($id);
+assertTestTrue($component instanceof Component, 'findByIdWithDependencies() with no deps should return a Component.');
+assertTestSame([], $component->dependencies, 'findByIdWithDependencies() should return empty dependencies array.');
+
+// ---------------------------------------------------------------------------
+// findByIdWithDependencies() — not found
+// ---------------------------------------------------------------------------
+
+$repo = new ComponentRepository(createTestPdo());
+$notFound = $repo->findByIdWithDependencies(999);
+assertTestNull($notFound, 'findByIdWithDependencies() should return null for a non-existent ID.');
+
+// ---------------------------------------------------------------------------
 // delete() — found
 // ---------------------------------------------------------------------------
 

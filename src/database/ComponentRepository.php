@@ -39,6 +39,34 @@ final class ComponentRepository
         );
     }
 
+    public function findByIdWithDependencies(int $id): ?Component
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT c.id, c.name, c.version, c.owner, c.language, p.name AS project_name
+             FROM components c
+             JOIN projects p ON p.id = c.project_id
+             WHERE c.id = :id'
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+
+        if ($row === false) {
+            return null;
+        }
+
+        $dependenciesByComponentId = $this->fetchDependencies([$id]);
+
+        return new Component(
+            (int) $row['id'],
+            $row['name'],
+            $row['version'],
+            $row['owner'],
+            $row['language'],
+            $row['project_name'],
+            $dependenciesByComponentId[$id] ?? [],
+        );
+    }
+
     /**
      * @param array<int, array{name: string, version: string}> $dependencies
      */
