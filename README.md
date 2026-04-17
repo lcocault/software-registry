@@ -4,10 +4,15 @@ Web site managing a registry of software components and their dependencies.
 
 ## Features
 
+A **user registry** stores:
+- First name
+- Last name
+- Email address
+
 Each software component stores:
 - name
 - version
-- owner
+- owner (selected from the user registry)
 - project
 - language
 - list of versioned dependencies
@@ -33,3 +38,10 @@ The registration form supports dependency import from:
    ```bash
    php -S 127.0.0.1:8000 -t .
    ```
+
+## Upgrading an existing database
+
+If you already have data from a previous version, run the migration script:
+```sql
+\i database/update_002.sql
+```

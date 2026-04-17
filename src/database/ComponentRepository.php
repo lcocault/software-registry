@@ -17,9 +17,12 @@ final class ComponentRepository
     public function findById(int $id): ?Component
     {
         $stmt = $this->pdo->prepare(
-            'SELECT c.id, c.name, c.version, c.owner, c.language, p.name AS project_name
+            'SELECT c.id, c.name, c.version, c.owner_id,
+                    u.firstname || \' \' || u.name AS owner_name,
+                    c.language, p.name AS project_name
              FROM components c
              JOIN projects p ON p.id = c.project_id
+             JOIN users u ON u.id = c.owner_id
              WHERE c.id = :id'
         );
         $stmt->execute(['id' => $id]);
@@ -33,7 +36,8 @@ final class ComponentRepository
             (int) $row['id'],
             $row['name'],
             $row['version'],
-            $row['owner'],
+            (int) $row['owner_id'],
+            $row['owner_name'],
             $row['language'],
             $row['project_name'],
         );
@@ -42,9 +46,12 @@ final class ComponentRepository
     public function findByIdWithDependencies(int $id): ?Component
     {
         $stmt = $this->pdo->prepare(
-            'SELECT c.id, c.name, c.version, c.owner, c.language, p.name AS project_name
+            'SELECT c.id, c.name, c.version, c.owner_id,
+                    u.firstname || \' \' || u.name AS owner_name,
+                    c.language, p.name AS project_name
              FROM components c
              JOIN projects p ON p.id = c.project_id
+             JOIN users u ON u.id = c.owner_id
              WHERE c.id = :id'
         );
         $stmt->execute(['id' => $id]);
@@ -60,7 +67,8 @@ final class ComponentRepository
             (int) $row['id'],
             $row['name'],
             $row['version'],
-            $row['owner'],
+            (int) $row['owner_id'],
+            $row['owner_name'],
             $row['language'],
             $row['project_name'],
             $dependenciesByComponentId[$id] ?? [],
@@ -73,7 +81,7 @@ final class ComponentRepository
     public function save(
         string $name,
         string $version,
-        string $owner,
+        int $ownerId,
         string $project,
         string $language,
         array $dependencies,
@@ -84,14 +92,14 @@ final class ComponentRepository
             $projectId = $this->upsertProject($project);
 
             $stmt = $this->pdo->prepare(
-                'INSERT INTO components(name, version, owner, language, project_id)
-                 VALUES(:name, :version, :owner, :language, :project_id) RETURNING id'
+                'INSERT INTO components(name, version, owner_id, language, project_id)
+                 VALUES(:name, :version, :owner_id, :language, :project_id) RETURNING id'
             );
             $stmt->execute([
-                'name' => $name,
-                'version' => $version,
-                'owner' => $owner,
-                'language' => $language,
+                'name'       => $name,
+                'version'    => $version,
+                'owner_id'   => $ownerId,
+                'language'   => $language,
                 'project_id' => $projectId,
             ]);
             $componentId = (int) $stmt->fetchColumn();
@@ -120,7 +128,7 @@ final class ComponentRepository
         int $id,
         string $name,
         string $version,
-        string $owner,
+        int $ownerId,
         string $project,
         string $language,
         ?array $dependencies,
@@ -132,17 +140,17 @@ final class ComponentRepository
 
             $stmt = $this->pdo->prepare(
                 'UPDATE components
-                 SET name = :name, version = :version, owner = :owner,
+                 SET name = :name, version = :version, owner_id = :owner_id,
                      language = :language, project_id = :project_id
                  WHERE id = :id'
             );
             $stmt->execute([
-                'name' => $name,
-                'version' => $version,
-                'owner' => $owner,
-                'language' => $language,
+                'name'       => $name,
+                'version'    => $version,
+                'owner_id'   => $ownerId,
+                'language'   => $language,
                 'project_id' => $projectId,
-                'id' => $id,
+                'id'         => $id,
             ]);
 
             if ($stmt->rowCount() === 0) {
@@ -178,9 +186,12 @@ final class ComponentRepository
     public function listAll(): array
     {
         $rows = $this->pdo->query(
-            'SELECT c.id, c.name, c.version, c.owner, c.language, p.name AS project_name
+            'SELECT c.id, c.name, c.version, c.owner_id,
+                    u.firstname || \' \' || u.name AS owner_name,
+                    c.language, p.name AS project_name
              FROM components c
              JOIN projects p ON p.id = c.project_id
+             JOIN users u ON u.id = c.owner_id
              ORDER BY c.id DESC
              LIMIT 200'
         )->fetchAll();
@@ -197,7 +208,8 @@ final class ComponentRepository
                 (int) $row['id'],
                 $row['name'],
                 $row['version'],
-                $row['owner'],
+                (int) $row['owner_id'],
+                $row['owner_name'],
                 $row['language'],
                 $row['project_name'],
                 $dependenciesByComponentId[(int) $row['id']] ?? [],
