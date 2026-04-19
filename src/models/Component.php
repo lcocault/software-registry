@@ -5,7 +5,8 @@ declare(strict_types=1);
 final class Component
 {
     /**
-     * @param ComponentVersion[] $versions
+     * @param ComponentVersion[]    $versions
+     * @param HighLevelDependency[] $highLevelDependencies
      */
     public function __construct(
         public readonly int $id,
@@ -15,5 +16,6 @@ final class Component
         public readonly string $language,
         public readonly string $projectName,
         public readonly array $versions = [],
+        public readonly array $highLevelDependencies = [],
     ) {}
 }

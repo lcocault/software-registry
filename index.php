@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/src/models/Dependency.php';
+require_once __DIR__ . '/src/models/HighLevelDependency.php';
 require_once __DIR__ . '/src/models/ComponentVersion.php';
 require_once __DIR__ . '/src/models/Component.php';
 require_once __DIR__ . '/src/models/User.php';
@@ -30,6 +31,7 @@ $viewCveCheckComponent = null;
 $viewCveCheckVersion = null;
 $viewCveCheckData = null;
 $allCveCounts = [];
+$viewHighLevelDepsComponent = null;
 
 $repository = null;
 $userRepository = null;
@@ -284,6 +286,108 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'add_high_level_dep') {
+        $componentId        = (int) ($_POST['component_id'] ?? 0);
+        $hldName            = trim($_POST['hld_name'] ?? '');
+        $reuseJustification = trim($_POST['reuse_justification'] ?? '');
+        $integrationStrategy = trim($_POST['integration_strategy'] ?? '');
+        $validationStrategy = trim($_POST['validation_strategy'] ?? '');
+
+        if ($componentId <= 0 || $hldName === '') {
+            $message = 'Component ID and high-level dependency name are required.';
+            $messageType = 'error';
+        } elseif (strlen($hldName) > 255) {
+            $message = 'High-level dependency name must be at most 255 characters.';
+            $messageType = 'error';
+        } else {
+            try {
+                $result = $repository->addHighLevelDependency(
+                    $componentId,
+                    $hldName,
+                    $reuseJustification,
+                    $integrationStrategy,
+                    $validationStrategy,
+                );
+                if ($result === false) {
+                    $message = 'Component not found.';
+                    $messageType = 'error';
+                } else {
+                    header('Location: ?high_level_deps=' . $componentId);
+                    exit;
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to add high-level dependency: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
+    } elseif ($action === 'delete_high_level_dep') {
+        $componentId   = (int) ($_POST['component_id'] ?? 0);
+        $highLevelDepId = (int) ($_POST['high_level_dep_id'] ?? 0);
+
+        if ($componentId <= 0 || $highLevelDepId <= 0) {
+            $message = 'Invalid component or high-level dependency ID.';
+            $messageType = 'error';
+        } else {
+            try {
+                if (!$repository->deleteHighLevelDependency($componentId, $highLevelDepId)) {
+                    $message = 'High-level dependency not found.';
+                    $messageType = 'error';
+                } else {
+                    header('Location: ?high_level_deps=' . $componentId);
+                    exit;
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to delete high-level dependency: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
+    } elseif ($action === 'add_high_level_dep_third_party') {
+        $componentId    = (int) ($_POST['component_id'] ?? 0);
+        $highLevelDepId = (int) ($_POST['high_level_dep_id'] ?? 0);
+        $depName        = trim($_POST['dep_name'] ?? '');
+
+        if ($componentId <= 0 || $highLevelDepId <= 0 || $depName === '') {
+            $message = 'All fields are required.';
+            $messageType = 'error';
+        } elseif (strlen($depName) > 255) {
+            $message = 'Dependency name must be at most 255 characters.';
+            $messageType = 'error';
+        } else {
+            try {
+                if (!$repository->addHighLevelDepThirdParty($componentId, $highLevelDepId, $depName)) {
+                    $message = 'High-level dependency not found.';
+                    $messageType = 'error';
+                } else {
+                    header('Location: ?high_level_deps=' . $componentId);
+                    exit;
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to link 3rd party dependency: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
+    } elseif ($action === 'delete_high_level_dep_third_party') {
+        $componentId    = (int) ($_POST['component_id'] ?? 0);
+        $highLevelDepId = (int) ($_POST['high_level_dep_id'] ?? 0);
+        $depName        = trim($_POST['dep_name'] ?? '');
+
+        if ($componentId <= 0 || $highLevelDepId <= 0 || $depName === '') {
+            $message = 'Invalid request.';
+            $messageType = 'error';
+        } else {
+            try {
+                if (!$repository->deleteHighLevelDepThirdParty($componentId, $highLevelDepId, $depName)) {
+                    $message = '3rd party dependency link not found.';
+                    $messageType = 'error';
+                } else {
+                    header('Location: ?high_level_deps=' . $componentId);
+                    exit;
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to remove 3rd party dependency: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
     } else {
         $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
@@ -384,6 +488,33 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
             if ($cveRepository !== null) {
                 $allCveCounts = $cveRepository->getAllCounts();
             }
+        } catch (Throwable) {
+            // silently ignore; the original error message is already set
+        }
+    }
+}
+
+if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['high_level_deps'])) {
+    $hldId = (int) $_GET['high_level_deps'];
+    if ($hldId > 0) {
+        try {
+            $viewHighLevelDepsComponent = $repository->findByIdWithHighLevelDeps($hldId);
+            if ($viewHighLevelDepsComponent === null) {
+                $message = 'Component not found.';
+                $messageType = 'error';
+            }
+        } catch (Throwable $exception) {
+            $message = 'Unable to load component: ' . $exception->getMessage();
+            $messageType = 'error';
+        }
+    }
+} elseif ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST'
+    && in_array($_POST['action'] ?? '', ['add_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party'], true)
+    && $messageType === 'error') {
+    $hldCompId = (int) ($_POST['component_id'] ?? 0);
+    if ($hldCompId > 0) {
+        try {
+            $viewHighLevelDepsComponent = $repository->findByIdWithHighLevelDeps($hldCompId);
         } catch (Throwable) {
             // silently ignore; the original error message is already set
         }
@@ -494,7 +625,7 @@ if ($repository !== null && $showCatalogSection && $_SERVER['REQUEST_METHOD'] ==
 }
 
 $components = [];
-if ($repository !== null && $viewDepsComponent === null && $viewCveCheckData === null && !$showCatalogSection) {
+if ($repository !== null && $viewDepsComponent === null && $viewHighLevelDepsComponent === null && $viewCveCheckData === null && !$showCatalogSection) {
     try {
         $components = $repository->listAll();
         if ($cveRepository !== null) {
@@ -529,7 +660,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency'], true)
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency', 'add_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party'], true)
     && $messageType === 'error';
 
 $showUserForm = $editUser !== null
@@ -1259,6 +1390,10 @@ $showForm = $editComponent !== null
         <?php elseif ($viewDepsComponent !== null): ?>
         <div class="card">
             <?php $component = $viewDepsComponent; include __DIR__ . '/src/views/dependencies.php'; ?>
+        </div>
+        <?php elseif ($viewHighLevelDepsComponent !== null): ?>
+        <div class="card">
+            <?php $component = $viewHighLevelDepsComponent; include __DIR__ . '/src/views/high_level_deps.php'; ?>
         </div>
         <?php else: ?>
         <div class="card">
