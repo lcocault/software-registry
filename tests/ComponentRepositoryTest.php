@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/TestHelpers.php';
 require_once __DIR__ . '/../src/models/Dependency.php';
+require_once __DIR__ . '/../src/models/ComponentVersion.php';
 require_once __DIR__ . '/../src/models/Component.php';
 require_once __DIR__ . '/../src/models/User.php';
 require_once __DIR__ . '/../src/database/ComponentRepository.php';
@@ -34,7 +35,6 @@ function createTestPdo(): PDO
         CREATE TABLE components (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             name       TEXT NOT NULL,
-            version    TEXT NOT NULL,
             owner_id   INTEGER NOT NULL REFERENCES users(id),
             language   TEXT NOT NULL,
             project_id INTEGER NOT NULL REFERENCES projects(id),
@@ -42,15 +42,22 @@ function createTestPdo(): PDO
         );
         CREATE INDEX idx_components_project_id ON components(project_id);
         CREATE INDEX idx_components_owner_id   ON components(owner_id);
+        CREATE TABLE component_versions (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+            label        TEXT NOT NULL,
+            UNIQUE (component_id, label)
+        );
+        CREATE INDEX idx_component_versions_component_id ON component_versions(component_id);
         CREATE TABLE dependencies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL
         );
         CREATE TABLE versioned_dependencies (
-            component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+            component_version_id INTEGER NOT NULL REFERENCES component_versions(id) ON DELETE CASCADE,
             dependency_id INTEGER NOT NULL REFERENCES dependencies(id),
             version TEXT NOT NULL,
-            PRIMARY KEY (component_id, dependency_id)
+            PRIMARY KEY (component_version_id, dependency_id)
         );
         CREATE INDEX idx_versioned_dependencies_dependency_id ON versioned_dependencies(dependency_id);'
     );
@@ -82,11 +89,12 @@ $component = $repo->findById($id);
 assertTestTrue($component instanceof Component, 'findById() should return a Component instance.');
 assertTestSame($id, $component->id, 'findById() component id should match saved id.');
 assertTestSame('demo-service', $component->name, 'findById() name should match.');
-assertTestSame('3.1.0', $component->version, 'findById() version should match.');
 assertTestSame($ownerId, $component->ownerId, 'findById() ownerId should match.');
 assertTestSame('Bob Jones', $component->owner, 'findById() owner display name should match.');
 assertTestSame('Python', $component->language, 'findById() language should match.');
 assertTestSame('backend', $component->projectName, 'findById() projectName should match.');
+assertTestSame(1, count($component->versions), 'findById() should include 1 version.');
+assertTestSame('3.1.0', $component->versions[0]->label, 'findById() version label should match.');
 
 // ---------------------------------------------------------------------------
 // findById() — not found
@@ -97,7 +105,7 @@ $notFound = $repo->findById(999);
 assertTestNull($notFound, 'findById() should return null for a non-existent ID.');
 
 // ---------------------------------------------------------------------------
-// findByIdWithDependencies() — found with dependencies
+// findByIdWithVersions() — found with dependencies
 // ---------------------------------------------------------------------------
 
 $pdo = createTestPdo();
@@ -109,21 +117,23 @@ $deps = [
     ['name' => 'com.google.guava:guava', 'version' => '31.1-jre'],
 ];
 $id = $repo->save('svc-with-deps', '4.0.0', $ownerId, 'platform', 'Java', $deps);
-$component = $repo->findByIdWithDependencies($id);
-assertTestTrue($component instanceof Component, 'findByIdWithDependencies() should return a Component instance.');
-assertTestSame($id, $component->id, 'findByIdWithDependencies() component id should match saved id.');
-assertTestSame('svc-with-deps', $component->name, 'findByIdWithDependencies() name should match.');
-assertTestSame(2, count($component->dependencies), 'findByIdWithDependencies() should include 2 dependencies.');
-$depNames = array_map(static fn (Dependency $d): string => $d->name, $component->dependencies);
+$component = $repo->findByIdWithVersions($id);
+assertTestTrue($component instanceof Component, 'findByIdWithVersions() should return a Component instance.');
+assertTestSame($id, $component->id, 'findByIdWithVersions() component id should match saved id.');
+assertTestSame('svc-with-deps', $component->name, 'findByIdWithVersions() name should match.');
+assertTestSame(1, count($component->versions), 'findByIdWithVersions() should include 1 version.');
+assertTestSame('4.0.0', $component->versions[0]->label, 'findByIdWithVersions() version label should match.');
+assertTestSame(2, count($component->versions[0]->dependencies), 'findByIdWithVersions() should include 2 dependencies.');
+$depNames = array_map(static fn (Dependency $d): string => $d->name, $component->versions[0]->dependencies);
 sort($depNames);
 assertTestSame(
     ['com.google.guava:guava', 'org.slf4j:slf4j-api'],
     $depNames,
-    'findByIdWithDependencies() dependency names should match (sorted alphabetically).'
+    'findByIdWithVersions() dependency names should match (sorted alphabetically).'
 );
 
 // ---------------------------------------------------------------------------
-// findByIdWithDependencies() — found with no dependencies
+// findByIdWithVersions() — found with no dependencies
 // ---------------------------------------------------------------------------
 
 $pdo = createTestPdo();
@@ -131,17 +141,18 @@ $userRepo = new UserRepository($pdo);
 $repo = new ComponentRepository($pdo);
 $ownerId = $userRepo->save('Dave', 'Lee', 'dave@example.com');
 $id = $repo->save('svc-no-deps', '1.0.0', $ownerId, 'project', 'Python', []);
-$component = $repo->findByIdWithDependencies($id);
-assertTestTrue($component instanceof Component, 'findByIdWithDependencies() with no deps should return a Component.');
-assertTestSame([], $component->dependencies, 'findByIdWithDependencies() should return empty dependencies array.');
+$component = $repo->findByIdWithVersions($id);
+assertTestTrue($component instanceof Component, 'findByIdWithVersions() with no deps should return a Component.');
+assertTestSame(1, count($component->versions), 'findByIdWithVersions() should include 1 version.');
+assertTestSame([], $component->versions[0]->dependencies, 'findByIdWithVersions() version should have empty dependencies array.');
 
 // ---------------------------------------------------------------------------
-// findByIdWithDependencies() — not found
+// findByIdWithVersions() — not found
 // ---------------------------------------------------------------------------
 
 $repo = new ComponentRepository(createTestPdo());
-$notFound = $repo->findByIdWithDependencies(999);
-assertTestNull($notFound, 'findByIdWithDependencies() should return null for a non-existent ID.');
+$notFound = $repo->findByIdWithVersions(999);
+assertTestNull($notFound, 'findByIdWithVersions() should return null for a non-existent ID.');
 
 // ---------------------------------------------------------------------------
 // delete() — found
@@ -175,9 +186,12 @@ $updated = $repo->update($id, 'new-name', '2.0', $ownerId, 'proj-b', 'Python', n
 assertTestTrue($updated, 'update() should return true for an existing component.');
 $component = $repo->findById($id);
 assertTestSame('new-name', $component->name, 'update() should change name.');
-assertTestSame('2.0', $component->version, 'update() should change version.');
 assertTestSame('proj-b', $component->projectName, 'update() should change project name.');
 assertTestSame('Python', $component->language, 'update() should change language.');
+// update() with null deps and a new label adds a version
+$versionLabels = array_map(static fn (ComponentVersion $v): string => $v->label, $component->versions);
+sort($versionLabels);
+assertTestSame(['1.0', '2.0'], $versionLabels, 'update() with new label should add a version.');
 
 // ---------------------------------------------------------------------------
 // update() — not found
@@ -188,7 +202,7 @@ $notUpdated = $repo->update(999, 'x', '1', 1, 'z', 'Java', null);
 assertTestTrue(!$notUpdated, 'update() should return false for a non-existent ID.');
 
 // ---------------------------------------------------------------------------
-// listAll() — returns components with dependencies
+// listAll() — returns components with versions and dependencies
 // ---------------------------------------------------------------------------
 
 $pdo = createTestPdo();
@@ -205,8 +219,10 @@ assertTestTrue(count($all) === 1, 'listAll() should return one component.');
 $saved = $all[0];
 assertTestSame($id, $saved->id, 'listAll() component id should match saved id.');
 assertTestSame('my-app', $saved->name, 'listAll() name should match.');
-assertTestSame(2, count($saved->dependencies), 'listAll() should include 2 dependencies.');
-$depNames = array_map(static fn (Dependency $d): string => $d->name, $saved->dependencies);
+assertTestSame(1, count($saved->versions), 'listAll() should include 1 version.');
+assertTestSame('1.0.0', $saved->versions[0]->label, 'listAll() version label should match.');
+assertTestSame(2, count($saved->versions[0]->dependencies), 'listAll() version should include 2 dependencies.');
+$depNames = array_map(static fn (Dependency $d): string => $d->name, $saved->versions[0]->dependencies);
 sort($depNames);
 assertTestSame(
     ['org.junit.jupiter:junit-jupiter', 'org.slf4j:slf4j-api'],
@@ -215,7 +231,7 @@ assertTestSame(
 );
 
 // ---------------------------------------------------------------------------
-// update() — replace dependencies
+// update() — replace dependencies for an existing version
 // ---------------------------------------------------------------------------
 
 $pdo = createTestPdo();
@@ -225,19 +241,49 @@ $ownerId = $userRepo->save('Frank', 'White', 'frank@example.com');
 $id = $repo->save('lib', '1.0', $ownerId, 'proj', 'Java', [
     ['name' => 'old-dep', 'version' => '1.0'],
 ]);
-$repo->update($id, 'lib', '2.0', $ownerId, 'proj', 'Java', [
+$repo->update($id, 'lib', '1.0', $ownerId, 'proj', 'Java', [
     ['name' => 'new-dep-a', 'version' => '2.1'],
     ['name' => 'new-dep-b', 'version' => '3.0'],
 ]);
 $all = $repo->listAll();
 assertTestTrue(count($all) === 1, 'listAll() should return one component after update.');
-$depNames = array_map(static fn (Dependency $d): string => $d->name, $all[0]->dependencies);
+assertTestSame(1, count($all[0]->versions), 'update() on same label should not add a new version.');
+$depNames = array_map(static fn (Dependency $d): string => $d->name, $all[0]->versions[0]->dependencies);
 sort($depNames);
 assertTestSame(
     ['new-dep-a', 'new-dep-b'],
     $depNames,
     'update() should replace the old dependency list with the new one.'
 );
+
+// ---------------------------------------------------------------------------
+// update() — add a new version to an existing component
+// ---------------------------------------------------------------------------
+
+$pdo = createTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Grace', 'Brown', 'grace@example.com');
+$id = $repo->save('versioned-lib', '1.0', $ownerId, 'proj', 'Java', [
+    ['name' => 'dep-a', 'version' => '1.0'],
+]);
+$repo->update($id, 'versioned-lib', '2.0', $ownerId, 'proj', 'Java', [
+    ['name' => 'dep-b', 'version' => '2.0'],
+]);
+$component = $repo->findByIdWithVersions($id);
+assertTestSame(2, count($component->versions), 'Adding a new version label should create a second version.');
+$versionLabels = array_map(static fn (ComponentVersion $v): string => $v->label, $component->versions);
+sort($versionLabels);
+assertTestSame(['1.0', '2.0'], $versionLabels, 'Both version labels should be present.');
+$v2 = null;
+foreach ($component->versions as $v) {
+    if ($v->label === '2.0') {
+        $v2 = $v;
+    }
+}
+assertTestTrue($v2 !== null, 'Version 2.0 should exist.');
+assertTestSame(1, count($v2->dependencies), 'Version 2.0 should have 1 dependency.');
+assertTestSame('dep-b', $v2->dependencies[0]->name, 'Version 2.0 dependency name should match.');
 
 // ---------------------------------------------------------------------------
 // upsertProject — same project name yields same project for multiple components
@@ -282,10 +328,11 @@ assertTestTrue($savedId > 0, 'Java import: save() should return a positive ID.')
 $all = $repo->listAll();
 assertTestTrue(count($all) === 1, 'Java import: listAll() should return one component.');
 assertTestSame('com.example:demo', $all[0]->name, 'Java import: component name should match.');
-assertTestSame('1.0-SNAPSHOT', $all[0]->version, 'Java import: component version should match.');
-assertTestSame(2, count($all[0]->dependencies), 'Java import: component should have 2 dependencies.');
+assertTestSame(1, count($all[0]->versions), 'Java import: component should have 1 version.');
+assertTestSame('1.0-SNAPSHOT', $all[0]->versions[0]->label, 'Java import: version label should match.');
+assertTestSame(2, count($all[0]->versions[0]->dependencies), 'Java import: version should have 2 dependencies.');
 
-$depNames = array_map(static fn (Dependency $d): string => $d->name, $all[0]->dependencies);
+$depNames = array_map(static fn (Dependency $d): string => $d->name, $all[0]->versions[0]->dependencies);
 sort($depNames);
 assertTestSame(
     ['org.junit.jupiter:junit-jupiter', 'org.slf4j:slf4j-api'],
@@ -335,7 +382,7 @@ $all2 = $repo2->listAll();
 assertTestTrue(count($all2) === 1, 'Java large import: listAll() should return one component.');
 assertTestSame(
     count($parsedLarge),
-    count($all2[0]->dependencies),
+    count($all2[0]->versions[0]->dependencies),
     'Java large import: all parsed dependencies should be stored.'
 );
 

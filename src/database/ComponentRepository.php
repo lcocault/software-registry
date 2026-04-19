@@ -17,7 +17,7 @@ final class ComponentRepository
     public function findById(int $id): ?Component
     {
         $stmt = $this->pdo->prepare(
-            'SELECT c.id, c.name, c.version, c.owner_id,
+            'SELECT c.id, c.name, c.owner_id,
                     u.firstname || \' \' || u.name AS owner_name,
                     c.language, p.name AS project_name
              FROM components c
@@ -32,21 +32,23 @@ final class ComponentRepository
             return null;
         }
 
+        $versionsByComponentId = $this->fetchVersions([$id], false);
+
         return new Component(
             (int) $row['id'],
             $row['name'],
-            $row['version'],
             (int) $row['owner_id'],
             $row['owner_name'],
             $row['language'],
             $row['project_name'],
+            $versionsByComponentId[$id] ?? [],
         );
     }
 
-    public function findByIdWithDependencies(int $id): ?Component
+    public function findByIdWithVersions(int $id): ?Component
     {
         $stmt = $this->pdo->prepare(
-            'SELECT c.id, c.name, c.version, c.owner_id,
+            'SELECT c.id, c.name, c.owner_id,
                     u.firstname || \' \' || u.name AS owner_name,
                     c.language, p.name AS project_name
              FROM components c
@@ -61,17 +63,16 @@ final class ComponentRepository
             return null;
         }
 
-        $dependenciesByComponentId = $this->fetchDependencies([$id]);
+        $versionsByComponentId = $this->fetchVersions([$id], true);
 
         return new Component(
             (int) $row['id'],
             $row['name'],
-            $row['version'],
             (int) $row['owner_id'],
             $row['owner_name'],
             $row['language'],
             $row['project_name'],
-            $dependenciesByComponentId[$id] ?? [],
+            $versionsByComponentId[$id] ?? [],
         );
     }
 
@@ -80,7 +81,7 @@ final class ComponentRepository
      */
     public function save(
         string $name,
-        string $version,
+        string $versionLabel,
         int $ownerId,
         string $project,
         string $language,
@@ -92,12 +93,11 @@ final class ComponentRepository
             $projectId = $this->upsertProject($project);
 
             $stmt = $this->pdo->prepare(
-                'INSERT INTO components(name, version, owner_id, language, project_id)
-                 VALUES(:name, :version, :owner_id, :language, :project_id) RETURNING id'
+                'INSERT INTO components(name, owner_id, language, project_id)
+                 VALUES(:name, :owner_id, :language, :project_id) RETURNING id'
             );
             $stmt->execute([
                 'name'       => $name,
-                'version'    => $version,
                 'owner_id'   => $ownerId,
                 'language'   => $language,
                 'project_id' => $projectId,
@@ -105,8 +105,10 @@ final class ComponentRepository
             $componentId = (int) $stmt->fetchColumn();
             $stmt->closeCursor();
 
+            $versionId = $this->upsertComponentVersion($componentId, $versionLabel);
+
             if ($dependencies !== []) {
-                $this->insertDependencies($componentId, $dependencies);
+                $this->insertDependencies($versionId, $dependencies);
             }
 
             $this->pdo->commit();
@@ -127,7 +129,7 @@ final class ComponentRepository
     public function update(
         int $id,
         string $name,
-        string $version,
+        string $versionLabel,
         int $ownerId,
         string $project,
         string $language,
@@ -140,13 +142,12 @@ final class ComponentRepository
 
             $stmt = $this->pdo->prepare(
                 'UPDATE components
-                 SET name = :name, version = :version, owner_id = :owner_id,
+                 SET name = :name, owner_id = :owner_id,
                      language = :language, project_id = :project_id
                  WHERE id = :id'
             );
             $stmt->execute([
                 'name'       => $name,
-                'version'    => $version,
                 'owner_id'   => $ownerId,
                 'language'   => $language,
                 'project_id' => $projectId,
@@ -159,12 +160,14 @@ final class ComponentRepository
                 return false;
             }
 
+            $versionId = $this->upsertComponentVersion($id, $versionLabel);
+
             if ($dependencies !== null) {
-                $deleteStmt = $this->pdo->prepare('DELETE FROM versioned_dependencies WHERE component_id = :component_id');
-                $deleteStmt->execute(['component_id' => $id]);
+                $deleteStmt = $this->pdo->prepare('DELETE FROM versioned_dependencies WHERE component_version_id = :version_id');
+                $deleteStmt->execute(['version_id' => $versionId]);
 
                 if ($dependencies !== []) {
-                    $this->insertDependencies($id, $dependencies);
+                    $this->insertDependencies($versionId, $dependencies);
                 }
             }
 
@@ -186,7 +189,7 @@ final class ComponentRepository
     public function listAll(): array
     {
         $rows = $this->pdo->query(
-            'SELECT c.id, c.name, c.version, c.owner_id,
+            'SELECT c.id, c.name, c.owner_id,
                     u.firstname || \' \' || u.name AS owner_name,
                     c.language, p.name AS project_name
              FROM components c
@@ -201,18 +204,17 @@ final class ComponentRepository
         }
 
         $componentIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
-        $dependenciesByComponentId = $this->fetchDependencies($componentIds);
+        $versionsByComponentId = $this->fetchVersions($componentIds, true);
 
         return array_map(
             static fn (array $row): Component => new Component(
                 (int) $row['id'],
                 $row['name'],
-                $row['version'],
                 (int) $row['owner_id'],
                 $row['owner_name'],
                 $row['language'],
                 $row['project_name'],
-                $dependenciesByComponentId[(int) $row['id']] ?? [],
+                $versionsByComponentId[(int) $row['id']] ?? [],
             ),
             $rows,
         );
@@ -224,9 +226,10 @@ final class ComponentRepository
     public function listDependencyNames(): array
     {
         $rows = $this->pdo->query(
-            'SELECT d.name, COUNT(DISTINCT vd.component_id) AS usage_count
+            'SELECT d.name, COUNT(DISTINCT cv.component_id) AS usage_count
              FROM dependencies d
              JOIN versioned_dependencies vd ON vd.dependency_id = d.id
+             JOIN component_versions cv ON cv.id = vd.component_version_id
              GROUP BY d.id, d.name
              ORDER BY d.name'
         )->fetchAll();
@@ -246,9 +249,10 @@ final class ComponentRepository
     public function listDependencyVersions(string $name): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT vd.version, COUNT(DISTINCT vd.component_id) AS usage_count
+            'SELECT vd.version, COUNT(DISTINCT cv.component_id) AS usage_count
              FROM versioned_dependencies vd
              JOIN dependencies d ON d.id = vd.dependency_id
+             JOIN component_versions cv ON cv.id = vd.component_version_id
              WHERE d.name = :name
              GROUP BY vd.version
              ORDER BY vd.version'
@@ -265,21 +269,27 @@ final class ComponentRepository
     }
 
     /**
+     * Returns components that have a version using the given dependency.
+     * Each returned Component contains exactly the matching ComponentVersion
+     * in its versions array.
+     *
      * @return Component[]
      */
     public function listComponentsUsingDependency(string $name, string $version): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT c.id, c.name, c.version, c.owner_id,
+            'SELECT c.id, c.name, c.owner_id,
                     u.firstname || \' \' || u.name AS owner_name,
-                    c.language, p.name AS project_name
+                    c.language, p.name AS project_name,
+                    cv.id AS version_id, cv.label AS version_label
              FROM components c
              JOIN projects p ON p.id = c.project_id
              JOIN users u ON u.id = c.owner_id
-             JOIN versioned_dependencies vd ON vd.component_id = c.id
+             JOIN component_versions cv ON cv.component_id = c.id
+             JOIN versioned_dependencies vd ON vd.component_version_id = cv.id
              JOIN dependencies d ON d.id = vd.dependency_id
              WHERE d.name = :name AND vd.version = :version
-             ORDER BY c.name, c.version'
+             ORDER BY c.name, cv.label'
         );
         $stmt->execute(['name' => $name, 'version' => $version]);
 
@@ -287,11 +297,11 @@ final class ComponentRepository
             static fn (array $row): Component => new Component(
                 (int) $row['id'],
                 $row['name'],
-                $row['version'],
                 (int) $row['owner_id'],
                 $row['owner_name'],
                 $row['language'],
                 $row['project_name'],
+                [new ComponentVersion((int) $row['version_id'], $row['version_label'])],
             ),
             $stmt->fetchAll(),
         );
@@ -311,10 +321,25 @@ final class ComponentRepository
         return $id;
     }
 
+    private function upsertComponentVersion(int $componentId, string $label): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO component_versions(component_id, label)
+             VALUES(:component_id, :label)
+             ON CONFLICT(component_id, label) DO UPDATE SET label = EXCLUDED.label
+             RETURNING id'
+        );
+        $stmt->execute(['component_id' => $componentId, 'label' => $label]);
+        $id = (int) $stmt->fetchColumn();
+        $stmt->closeCursor();
+
+        return $id;
+    }
+
     /**
      * @param array<int, array{name: string, version: string}> $dependencies
      */
-    private function insertDependencies(int $componentId, array $dependencies): void
+    private function insertDependencies(int $versionId, array $dependencies): void
     {
         foreach ($dependencies as $dependency) {
             $stmt = $this->pdo->prepare(
@@ -327,34 +352,37 @@ final class ComponentRepository
             $stmt->closeCursor();
 
             $stmt = $this->pdo->prepare(
-                'INSERT INTO versioned_dependencies(component_id, dependency_id, version)
-                 VALUES(:component_id, :dependency_id, :version)
-                 ON CONFLICT(component_id, dependency_id) DO UPDATE SET version = EXCLUDED.version'
+                'INSERT INTO versioned_dependencies(component_version_id, dependency_id, version)
+                 VALUES(:version_id, :dependency_id, :version)
+                 ON CONFLICT(component_version_id, dependency_id) DO UPDATE SET version = EXCLUDED.version'
             );
             $stmt->execute([
-                'component_id' => $componentId,
+                'version_id'    => $versionId,
                 'dependency_id' => $dependencyId,
-                'version' => $dependency['version'],
+                'version'       => $dependency['version'],
             ]);
         }
     }
 
     /**
      * @param int[] $componentIds
-     * @return array<int, Dependency[]>
+     * @return array<int, ComponentVersion[]>  keyed by component_id
      */
-    private function fetchDependencies(array $componentIds): array
+    private function fetchVersions(array $componentIds, bool $withDeps): array
     {
+        if ($componentIds === []) {
+            return [];
+        }
+
         $placeholderTokens = array_map(
             static fn (int $index): string => ':id_' . $index,
             array_keys($componentIds),
         );
         $stmt = $this->pdo->prepare(
-            'SELECT vd.component_id, d.name, vd.version
-             FROM versioned_dependencies vd
-             JOIN dependencies d ON d.id = vd.dependency_id
-             WHERE vd.component_id IN (' . implode(', ', $placeholderTokens) . ')
-             ORDER BY d.name'
+            'SELECT cv.id, cv.component_id, cv.label
+             FROM component_versions cv
+             WHERE cv.component_id IN (' . implode(', ', $placeholderTokens) . ')
+             ORDER BY cv.label'
         );
 
         $params = [];
@@ -363,10 +391,57 @@ final class ComponentRepository
         }
         $stmt->execute($params);
 
+        $versionRows = $stmt->fetchAll();
+
+        $versionIds = array_map(static fn (array $row): int => (int) $row['id'], $versionRows);
+
+        $depsByVersionId = [];
+        if ($withDeps && $versionIds !== []) {
+            $depsByVersionId = $this->fetchDependencies($versionIds);
+        }
+
+        $result = [];
+        foreach ($versionRows as $row) {
+            $versionId   = (int) $row['id'];
+            $componentId = (int) $row['component_id'];
+            $result[$componentId][] = new ComponentVersion(
+                $versionId,
+                $row['label'],
+                $depsByVersionId[$versionId] ?? [],
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param int[] $versionIds
+     * @return array<int, Dependency[]>  keyed by component_version_id
+     */
+    private function fetchDependencies(array $versionIds): array
+    {
+        $placeholderTokens = array_map(
+            static fn (int $index): string => ':id_' . $index,
+            array_keys($versionIds),
+        );
+        $stmt = $this->pdo->prepare(
+            'SELECT vd.component_version_id, d.name, vd.version
+             FROM versioned_dependencies vd
+             JOIN dependencies d ON d.id = vd.dependency_id
+             WHERE vd.component_version_id IN (' . implode(', ', $placeholderTokens) . ')
+             ORDER BY d.name'
+        );
+
+        $params = [];
+        foreach ($versionIds as $index => $versionId) {
+            $params['id_' . $index] = $versionId;
+        }
+        $stmt->execute($params);
+
         $result = [];
         foreach ($stmt->fetchAll() as $row) {
-            $componentId = (int) $row['component_id'];
-            $result[$componentId][] = new Dependency($row['name'], $row['version']);
+            $versionId = (int) $row['component_version_id'];
+            $result[$versionId][] = new Dependency($row['name'], $row['version']);
         }
 
         return $result;

@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS components (
     id         SERIAL PRIMARY KEY,
     name       VARCHAR(255) NOT NULL,
-    version    VARCHAR(100) NOT NULL,
     owner_id   INTEGER NOT NULL REFERENCES users(id),
     language   VARCHAR(32) NOT NULL,
     project_id INTEGER NOT NULL REFERENCES projects(id),
@@ -23,16 +22,25 @@ CREATE TABLE IF NOT EXISTS components (
 CREATE INDEX IF NOT EXISTS idx_components_project_id ON components(project_id);
 CREATE INDEX IF NOT EXISTS idx_components_owner_id   ON components(owner_id);
 
+CREATE TABLE IF NOT EXISTS component_versions (
+    id           SERIAL PRIMARY KEY,
+    component_id INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+    label        VARCHAR(100) NOT NULL,
+    UNIQUE (component_id, label)
+);
+
+CREATE INDEX IF NOT EXISTS idx_component_versions_component_id ON component_versions(component_id);
+
 CREATE TABLE IF NOT EXISTS dependencies (
     id   SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS versioned_dependencies (
-    component_id  INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
-    dependency_id INTEGER NOT NULL REFERENCES dependencies(id),
-    version       VARCHAR(100) NOT NULL,
-    PRIMARY KEY (component_id, dependency_id)
+    component_version_id INTEGER NOT NULL REFERENCES component_versions(id) ON DELETE CASCADE,
+    dependency_id        INTEGER NOT NULL REFERENCES dependencies(id),
+    version              VARCHAR(100) NOT NULL,
+    PRIMARY KEY (component_version_id, dependency_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_versioned_dependencies_dependency_id ON versioned_dependencies(dependency_id);

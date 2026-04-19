@@ -1,6 +1,6 @@
 <?php
 // Variables expected:
-//   $components (Component[]) - list of components with their dependencies
+//   $components (Component[]) - list of components with their versions and dependencies
 
 $langIcons = [
     'Java'       => 'fab fa-java',
@@ -20,7 +20,7 @@ $langIcons = [
                 <thead>
                     <tr>
                         <th><i class="fas fa-tag"></i> Name</th>
-                        <th><i class="fas fa-code-branch"></i> Version</th>
+                        <th><i class="fas fa-code-branch"></i> Versions</th>
                         <th><i class="fas fa-user"></i> Owner</th>
                         <th><i class="fas fa-folder"></i> Project</th>
                         <th><i class="fas fa-code"></i> Language</th>
@@ -36,7 +36,15 @@ $langIcons = [
                                     <?= htmlspecialchars($component->name, ENT_QUOTES, 'UTF-8') ?>
                                 </a>
                             </td>
-                            <td><?= htmlspecialchars($component->version, ENT_QUOTES, 'UTF-8') ?></td>
+                            <td>
+                                <?php if ($component->versions === []): ?>
+                                    <span class="no-deps">None</span>
+                                <?php else: ?>
+                                    <?php foreach ($component->versions as $ver): ?>
+                                        <span class="dep-count"><?= htmlspecialchars($ver->label, ENT_QUOTES, 'UTF-8') ?></span>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </td>
                             <td><?= htmlspecialchars($component->owner, ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($component->projectName, ENT_QUOTES, 'UTF-8') ?></td>
                             <td>
@@ -46,7 +54,7 @@ $langIcons = [
                                 </span>
                             </td>
                             <td>
-                                <?php $depCount = count($component->dependencies); ?>
+                                <?php $depCount = array_sum(array_map(static fn ($v) => count($v->dependencies), $component->versions)); ?>
                                 <?php if ($depCount === 0): ?>
                                     <span class="no-deps">None</span>
                                 <?php else: ?>

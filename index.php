@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/src/models/Dependency.php';
+require_once __DIR__ . '/src/models/ComponentVersion.php';
 require_once __DIR__ . '/src/models/Component.php';
 require_once __DIR__ . '/src/models/User.php';
 require_once __DIR__ . '/src/models/Cve.php';
@@ -272,7 +273,7 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
     $depsId = (int) $_GET['deps'];
     if ($depsId > 0) {
         try {
-            $viewDepsComponent = $repository->findByIdWithDependencies($depsId);
+            $viewDepsComponent = $repository->findByIdWithVersions($depsId);
             if ($viewDepsComponent === null) {
                 $message = 'Component not found.';
                 $messageType = 'error';
@@ -830,6 +831,26 @@ $showForm = $editComponent !== null
             font-size: .85em;
             text-align: right;
             margin-top: 8px;
+        }
+
+        .deps-version-section {
+            margin-bottom: 24px;
+        }
+        .deps-version-label {
+            font-size: .95em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-hint {
+            display: block;
+            margin-top: 4px;
+            font-size: .82em;
+            color: var(--text-secondary);
         }
 
         .actions { white-space: nowrap; }
