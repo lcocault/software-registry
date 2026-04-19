@@ -5,7 +5,7 @@
 ?>
     <div class="card-title-bar">
         <h2 class="card-title"><i class="fas fa-cube"></i> <?= htmlspecialchars($catalogDepName, ENT_QUOTES, 'UTF-8') ?></h2>
-        <a href="?action=catalog" class="btn btn-cancel"><i class="fas fa-arrow-left"></i> Back to catalog</a>
+        <a href="?action=catalog" class="btn btn-cancel"><i class="fas fa-arrow-left"></i> Back to 3rd party</a>
     </div>
     <?php if ($catalogVersions === []): ?>
         <p class="empty-state"><i class="fas fa-inbox"></i> No versions found for this dependency.</p>

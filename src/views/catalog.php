@@ -3,10 +3,10 @@
 //   $catalogDeps (array<array{name: string, usage_count: int}>) - list of dependency names with usage counts
 ?>
     <div class="card-title-bar">
-        <h2 class="card-title"><i class="fas fa-book"></i> Components catalog</h2>
+        <h2 class="card-title"><i class="fas fa-book"></i> 3rd party components</h2>
     </div>
     <?php if ($catalogDeps === []): ?>
-        <p class="empty-state"><i class="fas fa-inbox"></i> No components found in the catalog yet.</p>
+        <p class="empty-state"><i class="fas fa-inbox"></i> No 3rd party components found yet.</p>
     <?php else: ?>
         <div class="table-wrapper">
             <table>
