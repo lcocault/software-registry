@@ -26,10 +26,17 @@ $langIcons = [
     <?php else: ?>
         <?php foreach ($component->versions as $version): ?>
             <div class="deps-version-section">
-                <h3 class="deps-version-label">
-                    <i class="fas fa-code-branch"></i>
-                    <span class="deps-component-version"><?= htmlspecialchars($version->label, ENT_QUOTES, 'UTF-8') ?></span>
-                </h3>
+                <div class="card-title-bar" style="margin-bottom:10px">
+                    <h3 class="deps-version-label" style="margin-bottom:0">
+                        <i class="fas fa-code-branch"></i>
+                        <span class="deps-component-version"><?= htmlspecialchars($version->label, ENT_QUOTES, 'UTF-8') ?></span>
+                    </h3>
+                    <?php if ($version->dependencies !== []): ?>
+                        <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>&amp;check_cves=<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit">
+                            <i class="fas fa-shield-halved"></i> Check CVEs
+                        </a>
+                    <?php endif; ?>
+                </div>
                 <?php if ($version->dependencies === []): ?>
                     <p class="empty-state"><i class="fas fa-inbox"></i> No dependencies registered for this version.</p>
                 <?php else: ?>
