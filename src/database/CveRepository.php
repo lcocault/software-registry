@@ -61,6 +61,34 @@ final class CveRepository
     }
 
     /**
+     * Returns CVE counts for all fetched dependency+version pairs, indexed by
+     * dependency name and then by version.  Only entries that have been fetched
+     * (i.e. recorded in dependency_cve_fetches) appear in the result.
+     *
+     * Usage: $count = $result[$name][$version] ?? null;
+     *
+     * @return array<string, array<string, int>>
+     */
+    public function getAllCounts(): array
+    {
+        $stmt = $this->pdo->query(
+            'SELECT dcf.dependency_name, dcf.dependency_version, COUNT(dc.id) AS cve_count
+             FROM dependency_cve_fetches dcf
+             LEFT JOIN dependency_cves dc
+                 ON dc.dependency_name  = dcf.dependency_name
+                AND dc.dependency_version = dcf.dependency_version
+             GROUP BY dcf.dependency_name, dcf.dependency_version'
+        );
+
+        $result = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $result[$row['dependency_name']][$row['dependency_version']] = (int) $row['cve_count'];
+        }
+
+        return $result;
+    }
+
+    /**
      * Stores the given CVEs for a dependency+version in the database, replacing any
      * previously stored data. Also records the fetch timestamp so that subsequent
      * requests do not hit the OSV API again.

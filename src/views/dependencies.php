@@ -1,6 +1,7 @@
 <?php
 // Variables expected:
-//   $component (Component) - the component whose versions and dependencies are displayed
+//   $component    (Component)     - the component whose versions and dependencies are displayed
+//   $allCveCounts (array)         - [dep_name][dep_version] => int|absent for fetched CVE counts
 
 $langIcons = [
     'Java'       => 'fab fa-java',
@@ -46,10 +47,12 @@ $langIcons = [
                                 <tr>
                                     <th><i class="fas fa-cube"></i> Dependency</th>
                                     <th><i class="fas fa-code-branch"></i> Version</th>
+                                    <th><i class="fas fa-shield-halved"></i> CVEs</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($version->dependencies as $dependency): ?>
+                                    <?php $cveCount = $allCveCounts[$dependency->name][$dependency->version] ?? null; ?>
                                     <tr>
                                         <td>
                                             <a href="?action=catalog&amp;catalog_dep=<?= urlencode($dependency->name) ?>" class="catalog-link">
@@ -60,6 +63,15 @@ $langIcons = [
                                             <a href="?action=catalog&amp;catalog_dep=<?= urlencode($dependency->name) ?>&amp;catalog_version=<?= urlencode($dependency->version) ?>" class="catalog-link">
                                                 <?= htmlspecialchars($dependency->version, ENT_QUOTES, 'UTF-8') ?>
                                             </a>
+                                        </td>
+                                        <td>
+                                            <?php if ($cveCount === null): ?>
+                                                <span class="cve-count-badge cve-count-unknown">—</span>
+                                            <?php elseif ($cveCount === 0): ?>
+                                                <span class="cve-count-badge cve-count-zero">0</span>
+                                            <?php else: ?>
+                                                <span class="cve-count-badge cve-count-vuln"><?= $cveCount ?></span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
