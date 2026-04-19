@@ -232,7 +232,7 @@ final class ComponentRepository
                  FROM dependencies d
                  JOIN versioned_dependencies vd ON vd.dependency_id = d.id
                  JOIN component_versions cv ON cv.id = vd.component_version_id
-                 GROUP BY d.name
+                 GROUP BY d.id, d.name
                  UNION ALL
                  SELECT DISTINCT name, 0
                  FROM catalog_entries
