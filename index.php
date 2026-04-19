@@ -406,6 +406,19 @@ if ($repository !== null && $showCatalogSection && $_SERVER['REQUEST_METHOD'] ==
             }
         } elseif ($catalogDepName !== null && $catalogDepName !== '') {
             $catalogVersions = $repository->listDependencyVersions($catalogDepName);
+            if ($cveRepository !== null) {
+                $catalogVersions = array_map(
+                    static fn (array $ver): array => $ver + [
+                        'cve_count' => $cveRepository->countByDependency($catalogDepName, $ver['version']),
+                    ],
+                    $catalogVersions,
+                );
+            } else {
+                $catalogVersions = array_map(
+                    static fn (array $ver): array => $ver + ['cve_count' => null],
+                    $catalogVersions,
+                );
+            }
         } else {
             $catalogDepName = null;
             $catalogDeps    = $repository->listDependencyNames();

@@ -123,4 +123,46 @@ assertTestNull($repo->findByDependency('dep:x', '2.0.0'), 'findByDependency() sh
 $loaded = $repo->findByDependency('dep:x', '1.0.0');
 assertTestSame(1, count($loaded), 'findByDependency() should return 1 CVE for dep:x 1.0.0.');
 
+// ---------------------------------------------------------------------------
+// countByDependency() — returns null when no fetch has been recorded
+// ---------------------------------------------------------------------------
+
+$repo = new CveRepository(createCveTestPdo());
+assertTestNull($repo->countByDependency('org.slf4j:slf4j-api', '2.0.13'), 'countByDependency() should return null when CVEs have never been fetched.');
+
+// ---------------------------------------------------------------------------
+// countByDependency() — returns 0 when fetched but no CVEs found
+// ---------------------------------------------------------------------------
+
+$pdo = createCveTestPdo();
+$repo = new CveRepository($pdo);
+$repo->store('safe:lib', '3.0.0', []);
+assertTestSame(0, $repo->countByDependency('safe:lib', '3.0.0'), 'countByDependency() should return 0 when stored with empty list.');
+
+// ---------------------------------------------------------------------------
+// countByDependency() — returns the correct count after store()
+// ---------------------------------------------------------------------------
+
+$pdo = createCveTestPdo();
+$repo = new CveRepository($pdo);
+$repo->store('log4j:log4j', '1.2.17', [
+    new Cve('CVE-2021-44228', 'Remote code execution in Log4j', 'CRITICAL'),
+    new Cve('CVE-2022-23302', 'JMSSink deserialization vulnerability', 'HIGH'),
+]);
+assertTestSame(2, $repo->countByDependency('log4j:log4j', '1.2.17'), 'countByDependency() should return 2 for log4j:log4j 1.2.17.');
+
+// Unrelated dependency should still return null
+assertTestNull($repo->countByDependency('other:lib', '1.0.0'), 'countByDependency() should return null for an unfetched dependency.');
+
+// ---------------------------------------------------------------------------
+// countByDependency() — version specificity
+// ---------------------------------------------------------------------------
+
+$pdo = createCveTestPdo();
+$repo = new CveRepository($pdo);
+$repo->store('dep:x', '1.0.0', [new Cve('CVE-2021-11111', 'Vuln in 1.0.0', 'HIGH')]);
+
+assertTestNull($repo->countByDependency('dep:x', '2.0.0'), 'countByDependency() should return null for a different version not yet fetched.');
+assertTestSame(1, $repo->countByDependency('dep:x', '1.0.0'), 'countByDependency() should return 1 for dep:x 1.0.0.');
+
 echo "CveRepository tests passed.\n";
