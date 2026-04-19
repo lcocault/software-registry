@@ -226,12 +226,19 @@ final class ComponentRepository
     public function listDependencyNames(): array
     {
         $rows = $this->pdo->query(
-            'SELECT d.name, COUNT(DISTINCT cv.component_id) AS usage_count
-             FROM dependencies d
-             JOIN versioned_dependencies vd ON vd.dependency_id = d.id
-             JOIN component_versions cv ON cv.id = vd.component_version_id
-             GROUP BY d.id, d.name
-             ORDER BY d.name'
+            'SELECT name, MAX(usage_count) AS usage_count
+             FROM (
+                 SELECT d.name, COUNT(DISTINCT cv.component_id) AS usage_count
+                 FROM dependencies d
+                 JOIN versioned_dependencies vd ON vd.dependency_id = d.id
+                 JOIN component_versions cv ON cv.id = vd.component_version_id
+                 GROUP BY d.name
+                 UNION ALL
+                 SELECT DISTINCT name, 0
+                 FROM catalog_entries
+             ) merged
+             GROUP BY name
+             ORDER BY name'
         )->fetchAll();
 
         return array_map(
@@ -249,13 +256,21 @@ final class ComponentRepository
     public function listDependencyVersions(string $name): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT vd.version, COUNT(DISTINCT cv.component_id) AS usage_count
-             FROM versioned_dependencies vd
-             JOIN dependencies d ON d.id = vd.dependency_id
-             JOIN component_versions cv ON cv.id = vd.component_version_id
-             WHERE d.name = :name
-             GROUP BY vd.version
-             ORDER BY vd.version'
+            'SELECT version, MAX(usage_count) AS usage_count
+             FROM (
+                 SELECT vd.version, COUNT(DISTINCT cv.component_id) AS usage_count
+                 FROM versioned_dependencies vd
+                 JOIN dependencies d ON d.id = vd.dependency_id
+                 JOIN component_versions cv ON cv.id = vd.component_version_id
+                 WHERE d.name = :name
+                 GROUP BY vd.version
+                 UNION ALL
+                 SELECT version, 0
+                 FROM catalog_entries
+                 WHERE name = :name
+             ) merged
+             GROUP BY version
+             ORDER BY version'
         );
         $stmt->execute(['name' => $name]);
 
@@ -266,6 +281,19 @@ final class ComponentRepository
             ],
             $stmt->fetchAll(),
         );
+    }
+
+    /**
+     * Adds a standalone 3rd party entry (name + version) to the catalog.
+     * Idempotent: silently ignores duplicates.
+     */
+    public function addCatalogEntry(string $name, string $version): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO catalog_entries(name, version) VALUES(:name, :version)
+             ON CONFLICT(name, version) DO NOTHING'
+        );
+        $stmt->execute(['name' => $name, 'version' => $version]);
     }
 
     /**

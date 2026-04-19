@@ -58,7 +58,14 @@ function createCatalogTestPdo(): PDO
             version TEXT NOT NULL,
             PRIMARY KEY (component_version_id, dependency_id)
         );
-        CREATE INDEX idx_versioned_dependencies_dependency_id ON versioned_dependencies(dependency_id);'
+        CREATE INDEX idx_versioned_dependencies_dependency_id ON versioned_dependencies(dependency_id);
+        CREATE TABLE catalog_entries (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            name    TEXT NOT NULL,
+            version TEXT NOT NULL,
+            UNIQUE (name, version)
+        );
+        CREATE INDEX idx_catalog_entries_name ON catalog_entries(name);'
     );
 
     return $pdo;
@@ -201,5 +208,79 @@ assertTestSame(1, count($componentA->versions), 'listComponentsUsingDependency()
 assertTestSame('1.0', $componentA->versions[0]->label, 'Component version label should be set correctly.');
 assertTestSame('Java', $componentA->language, 'Component language should be set correctly.');
 assertTestSame('proj', $componentA->projectName, 'Component projectName should be set correctly.');
+
+// ---------------------------------------------------------------------------
+// addCatalogEntry() — standalone entry appears in listDependencyNames()
+// ---------------------------------------------------------------------------
+
+$repo = new ComponentRepository(createCatalogTestPdo());
+$repo->addCatalogEntry('standalone-lib', '1.0.0');
+
+$names = $repo->listDependencyNames();
+assertTestSame(1, count($names), 'listDependencyNames() should return the manually-added entry.');
+assertTestSame('standalone-lib', $names[0]['name'], 'listDependencyNames() should return the correct name.');
+assertTestSame(0, $names[0]['usage_count'], 'Manually-added entry should have usage_count of 0.');
+
+// ---------------------------------------------------------------------------
+// addCatalogEntry() — duplicate is silently ignored (idempotent)
+// ---------------------------------------------------------------------------
+
+$repo = new ComponentRepository(createCatalogTestPdo());
+$repo->addCatalogEntry('my-lib', '2.0.0');
+$repo->addCatalogEntry('my-lib', '2.0.0'); // duplicate
+
+$names = $repo->listDependencyNames();
+assertTestSame(1, count($names), 'addCatalogEntry() duplicate should be ignored; still only 1 entry.');
+
+// ---------------------------------------------------------------------------
+// addCatalogEntry() — appears in listDependencyVersions()
+// ---------------------------------------------------------------------------
+
+$repo = new ComponentRepository(createCatalogTestPdo());
+$repo->addCatalogEntry('dep-q', '1.0');
+$repo->addCatalogEntry('dep-q', '2.0');
+
+$versions = $repo->listDependencyVersions('dep-q');
+assertTestSame(2, count($versions), 'listDependencyVersions() should return both manually-added versions.');
+$versionLabels = array_column($versions, 'version');
+sort($versionLabels);
+assertTestSame(['1.0', '2.0'], $versionLabels, 'listDependencyVersions() should return both versions.');
+foreach ($versions as $ver) {
+    assertTestSame(0, $ver['usage_count'], 'Manually-added version should have usage_count of 0.');
+}
+
+// ---------------------------------------------------------------------------
+// addCatalogEntry() — existing versioned dep takes precedence for usage_count
+// ---------------------------------------------------------------------------
+
+$pdo = createCatalogTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Dave', 'Brown', 'dave@example.com');
+
+// comp-a uses dep-z:3.0 via a component version
+$repo->save('comp-a', '1.0', $ownerId, 'proj', 'Java', [['name' => 'dep-z', 'version' => '3.0']]);
+// Also add the same entry manually
+$repo->addCatalogEntry('dep-z', '3.0');
+
+$names = $repo->listDependencyNames();
+$depZ = null;
+foreach ($names as $entry) {
+    if ($entry['name'] === 'dep-z') {
+        $depZ = $entry;
+    }
+}
+assertTestTrue($depZ !== null, 'dep-z should appear in listDependencyNames().');
+assertTestSame(1, $depZ['usage_count'], 'dep-z usage_count should reflect actual component usage, not 0.');
+
+$versions = $repo->listDependencyVersions('dep-z');
+$v30 = null;
+foreach ($versions as $ver) {
+    if ($ver['version'] === '3.0') {
+        $v30 = $ver;
+    }
+}
+assertTestTrue($v30 !== null, 'dep-z:3.0 should appear in listDependencyVersions().');
+assertTestSame(1, $v30['usage_count'], 'dep-z:3.0 usage_count should reflect actual component usage.');
 
 echo "Catalog repository tests passed.\n";

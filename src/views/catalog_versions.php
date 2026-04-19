@@ -45,3 +45,19 @@
             </table>
         </div>
     <?php endif; ?>
+    <div class="deps-add-version-section">
+        <h3 class="deps-version-label"><i class="fas fa-plus-circle"></i> Add new version</h3>
+        <form method="post" class="deps-add-dep-form">
+            <input type="hidden" name="action" value="add_catalog_version">
+            <input type="hidden" name="catalog_name" value="<?= htmlspecialchars($catalogDepName, ENT_QUOTES, 'UTF-8') ?>">
+            <div class="deps-inline-form">
+                <div class="form-group">
+                    <label for="catalog-new-version"><i class="fas fa-code-branch"></i> Version label</label>
+                    <input id="catalog-new-version" type="text" name="catalog_version" placeholder="e.g. 6.1.0" value="<?= htmlspecialchars($_POST['catalog_version'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="deps-inline-form-action">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add version</button>
+                </div>
+            </div>
+        </form>
+    </div>
