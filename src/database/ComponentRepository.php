@@ -307,6 +307,42 @@ final class ComponentRepository
         );
     }
 
+    /**
+     * Adds a new version label to an existing component.
+     * Returns false if the component does not exist, true otherwise (idempotent).
+     */
+    public function addVersion(int $componentId, string $label): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT id FROM components WHERE id = :id');
+        $stmt->execute(['id' => $componentId]);
+        if ($stmt->fetchColumn() === false) {
+            return false;
+        }
+
+        $this->upsertComponentVersion($componentId, $label);
+
+        return true;
+    }
+
+    /**
+     * Adds a single dependency to a specific component version.
+     * Returns false if the version does not belong to the given component, true otherwise.
+     */
+    public function addDependency(int $componentId, int $versionId, string $depName, string $depVersion): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM component_versions WHERE id = :id AND component_id = :component_id'
+        );
+        $stmt->execute(['id' => $versionId, 'component_id' => $componentId]);
+        if ($stmt->fetchColumn() === false) {
+            return false;
+        }
+
+        $this->insertDependencies($versionId, [['name' => $depName, 'version' => $depVersion]]);
+
+        return true;
+    }
+
     private function upsertProject(string $name): int
     {
         $stmt = $this->pdo->prepare(

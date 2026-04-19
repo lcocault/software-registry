@@ -80,6 +80,41 @@ $langIcons = [
                     </div>
                     <p class="deps-footer"><?= count($version->dependencies) ?> <?= count($version->dependencies) === 1 ? 'dependency' : 'dependencies' ?></p>
                 <?php endif; ?>
+                <form method="post" class="deps-add-dep-form">
+                    <input type="hidden" name="action" value="add_dependency">
+                    <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="version_id" value="<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="deps-inline-form">
+                        <div class="form-group">
+                            <label for="dep-name-<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-cube"></i> Dependency name</label>
+                            <input id="dep-name-<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>" type="text" name="dep_name" placeholder="e.g. org.slf4j:slf4j-api">
+                        </div>
+                        <div class="form-group">
+                            <label for="dep-version-<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-code-branch"></i> Version</label>
+                            <input id="dep-version-<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>" type="text" name="dep_version" placeholder="e.g. 2.0.13">
+                        </div>
+                        <div class="deps-inline-form-action">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add dependency</button>
+                        </div>
+                    </div>
+                </form>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
+
+    <div class="deps-add-version-section">
+        <h3 class="deps-version-label"><i class="fas fa-plus-circle"></i> Add new version</h3>
+        <form method="post" class="deps-add-dep-form">
+            <input type="hidden" name="action" value="add_version">
+            <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
+            <div class="deps-inline-form">
+                <div class="form-group">
+                    <label for="new-version-label"><i class="fas fa-code-branch"></i> Version label</label>
+                    <input id="new-version-label" type="text" name="version_label" placeholder="e.g. 2.0.0">
+                </div>
+                <div class="deps-inline-form-action">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add version</button>
+                </div>
+            </div>
+        </form>
+    </div>
