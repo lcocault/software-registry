@@ -24,10 +24,9 @@
             </div>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" title="<?= $editUser !== null ? 'Update user' : 'Add user' ?>">
                 <i class="fas <?= $editUser !== null ? 'fa-floppy-disk' : 'fa-plus' ?>"></i>
-                <?= $editUser !== null ? 'Update user' : 'Add user' ?>
             </button>
-            <a href="?action=users" class="btn btn-cancel"><i class="fas fa-xmark"></i> Cancel</a>
+            <a href="?action=users" class="btn btn-cancel" title="Cancel"><i class="fas fa-xmark"></i></a>
         </div>
     </form>

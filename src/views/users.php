@@ -5,7 +5,7 @@
 ?>
     <div class="card-title-bar">
         <h2 class="card-title"><i class="fas fa-users"></i> Registered users</h2>
-        <a href="?action=register_user" class="btn btn-primary"><i class="fas fa-plus"></i> Add user</a>
+        <a href="?action=register_user" class="btn btn-primary" title="Add user"><i class="fas fa-plus"></i></a>
     </div>
     <?php if ($users === []): ?>
         <p class="empty-state"><i class="fas fa-inbox"></i> No users registered yet.</p>
@@ -27,11 +27,11 @@
                             <td><?= htmlspecialchars($user->name, ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($user->email, ENT_QUOTES, 'UTF-8') ?></td>
                             <td class="actions">
-                                <a href="?edit_user=<?= htmlspecialchars((string) $user->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit"><i class="fas fa-pen"></i> Edit</a>
+                                <a href="?edit_user=<?= htmlspecialchars((string) $user->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit" title="Edit"><i class="fas fa-pen"></i></a>
                                 <form method="post">
                                     <input type="hidden" name="action" value="delete_user">
                                     <input type="hidden" name="user_id" value="<?= htmlspecialchars((string) $user->id, ENT_QUOTES, 'UTF-8') ?>">
-                                    <button type="submit" class="btn btn-delete" onclick="return confirm('Delete this user?')"><i class="fas fa-trash"></i> Delete</button>
+                                    <button type="submit" class="btn btn-delete" title="Delete" onclick="return confirm('Delete this user?')"><i class="fas fa-trash"></i></button>
                                 </form>
                             </td>
                         </tr>
