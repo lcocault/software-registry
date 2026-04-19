@@ -39,6 +39,28 @@ final class CveRepository
     }
 
     /**
+     * Returns the number of stored CVEs for this dependency+version, or null if CVEs have
+     * never been fetched from the OSV API for this combination.
+     */
+    public function countByDependency(string $name, string $version): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(dc.id) AS cve_count
+             FROM dependency_cve_fetches dcf
+             LEFT JOIN dependency_cves dc
+                 ON dc.dependency_name  = dcf.dependency_name
+                AND dc.dependency_version = dcf.dependency_version
+             WHERE dcf.dependency_name = :name AND dcf.dependency_version = :version
+             GROUP BY dcf.dependency_name, dcf.dependency_version'
+        );
+        $stmt->execute(['name' => $name, 'version' => $version]);
+
+        $row = $stmt->fetch();
+
+        return $row !== false ? (int) $row['cve_count'] : null;
+    }
+
+    /**
      * Stores the given CVEs for a dependency+version in the database, replacing any
      * previously stored data. Also records the fetch timestamp so that subsequent
      * requests do not hit the OSV API again.
