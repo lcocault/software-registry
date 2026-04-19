@@ -237,6 +237,53 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'add_version') {
+        $componentId  = (int) ($_POST['component_id'] ?? 0);
+        $versionLabel = trim($_POST['version_label'] ?? '');
+
+        if ($componentId <= 0 || $versionLabel === '') {
+            $message = 'Component ID and version label are required.';
+            $messageType = 'error';
+        } else {
+            try {
+                if (!$repository->addVersion($componentId, $versionLabel)) {
+                    $message = 'Component not found.';
+                    $messageType = 'error';
+                } else {
+                    header('Location: ?deps=' . $componentId);
+                    exit;
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to add version: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
+    } elseif ($action === 'add_dependency') {
+        $componentId = (int) ($_POST['component_id'] ?? 0);
+        $versionId   = (int) ($_POST['version_id'] ?? 0);
+        $depName     = trim($_POST['dep_name'] ?? '');
+        $depVersion  = trim($_POST['dep_version'] ?? '');
+
+        if ($componentId <= 0 || $versionId <= 0 || $depName === '' || $depVersion === '') {
+            $message = 'All dependency fields are required.';
+            $messageType = 'error';
+        } elseif (strlen($depName) > 255 || strlen($depVersion) > 100) {
+            $message = 'Dependency name must be at most 255 characters and version at most 100 characters.';
+            $messageType = 'error';
+        } else {
+            try {
+                if (!$repository->addDependency($componentId, $versionId, $depName, $depVersion)) {
+                    $message = 'Version not found.';
+                    $messageType = 'error';
+                } else {
+                    header('Location: ?deps=' . $componentId);
+                    exit;
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to add dependency: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
     } else {
         $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
@@ -325,6 +372,20 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
         } catch (Throwable $exception) {
             $message = 'Unable to load component: ' . $exception->getMessage();
             $messageType = 'error';
+        }
+    }
+} elseif ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST'
+    && in_array($_POST['action'] ?? '', ['add_version', 'add_dependency'], true)
+    && $messageType === 'error') {
+    $depsId = (int) ($_POST['component_id'] ?? 0);
+    if ($depsId > 0) {
+        try {
+            $viewDepsComponent = $repository->findByIdWithVersions($depsId);
+            if ($cveRepository !== null) {
+                $allCveCounts = $cveRepository->getAllCounts();
+            }
+        } catch (Throwable) {
+            // silently ignore; the original error message is already set
         }
     }
 }
@@ -468,7 +529,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves'], true)
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency'], true)
     && $messageType === 'error';
 
 $showUserForm = $editUser !== null
@@ -969,6 +1030,34 @@ $showForm = $editComponent !== null
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .deps-add-version-section {
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .deps-add-dep-form {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        .deps-inline-form {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .deps-inline-form .form-group {
+            flex: 1;
+            min-width: 160px;
+        }
+
+        .deps-inline-form-action {
+            padding-bottom: 1px;
         }
 
         .form-hint {

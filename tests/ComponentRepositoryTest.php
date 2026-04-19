@@ -386,4 +386,92 @@ assertTestSame(
     'Java large import: all parsed dependencies should be stored.'
 );
 
+// ---------------------------------------------------------------------------
+// addVersion() — basic
+// ---------------------------------------------------------------------------
+
+$pdo = createTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Hannah', 'Green', 'hannah@example.com');
+$id = $repo->save('versioned-comp', '1.0', $ownerId, 'proj', 'Java', []);
+$result = $repo->addVersion($id, '2.0');
+assertTestTrue($result, 'addVersion() should return true for an existing component.');
+$component = $repo->findByIdWithVersions($id);
+$versionLabels = array_map(static fn (ComponentVersion $v): string => $v->label, $component->versions);
+sort($versionLabels);
+assertTestSame(['1.0', '2.0'], $versionLabels, 'addVersion() should add a new version label.');
+
+// ---------------------------------------------------------------------------
+// addVersion() — idempotent (existing label)
+// ---------------------------------------------------------------------------
+
+$pdo = createTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Ian', 'Black', 'ian@example.com');
+$id = $repo->save('idempotent-comp', '1.0', $ownerId, 'proj', 'Java', []);
+$result = $repo->addVersion($id, '1.0');
+assertTestTrue($result, 'addVersion() with existing label should still return true.');
+$component = $repo->findByIdWithVersions($id);
+assertTestSame(1, count($component->versions), 'addVersion() with existing label should not create a duplicate version.');
+
+// ---------------------------------------------------------------------------
+// addVersion() — component not found
+// ---------------------------------------------------------------------------
+
+$repo = new ComponentRepository(createTestPdo());
+$result = $repo->addVersion(999, '1.0');
+assertTestTrue(!$result, 'addVersion() should return false for a non-existent component.');
+
+// ---------------------------------------------------------------------------
+// addDependency() — basic
+// ---------------------------------------------------------------------------
+
+$pdo = createTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Jane', 'Doe', 'jane@example.com');
+$id = $repo->save('dep-comp', '1.0', $ownerId, 'proj', 'Java', []);
+$component = $repo->findByIdWithVersions($id);
+$versionId = $component->versions[0]->id;
+$result = $repo->addDependency($id, $versionId, 'org.slf4j:slf4j-api', '2.0.13');
+assertTestTrue($result, 'addDependency() should return true for a valid version.');
+$component = $repo->findByIdWithVersions($id);
+assertTestSame(1, count($component->versions[0]->dependencies), 'addDependency() should add a dependency.');
+assertTestSame('org.slf4j:slf4j-api', $component->versions[0]->dependencies[0]->name, 'addDependency() dependency name should match.');
+assertTestSame('2.0.13', $component->versions[0]->dependencies[0]->version, 'addDependency() dependency version should match.');
+
+// ---------------------------------------------------------------------------
+// addDependency() — idempotent (upsert on conflict)
+// ---------------------------------------------------------------------------
+
+$pdo = createTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Karl', 'White', 'karl@example.com');
+$id = $repo->save('upsert-dep-comp', '1.0', $ownerId, 'proj', 'Python', [
+    ['name' => 'requests', 'version' => '2.28.0'],
+]);
+$component = $repo->findByIdWithVersions($id);
+$versionId = $component->versions[0]->id;
+$repo->addDependency($id, $versionId, 'requests', '2.31.0');
+$component = $repo->findByIdWithVersions($id);
+assertTestSame(1, count($component->versions[0]->dependencies), 'addDependency() on existing dep name should upsert (not duplicate).');
+assertTestSame('2.31.0', $component->versions[0]->dependencies[0]->version, 'addDependency() should update the version on conflict.');
+
+// ---------------------------------------------------------------------------
+// addDependency() — version not found or wrong component
+// ---------------------------------------------------------------------------
+
+$pdo = createTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Laura', 'Gray', 'laura@example.com');
+$id = $repo->save('security-comp', '1.0', $ownerId, 'proj', 'JavaScript', []);
+$result = $repo->addDependency($id, 999, 'lodash', '4.17.21');
+assertTestTrue(!$result, 'addDependency() should return false for a non-existent version ID.');
+$result2 = $repo->addDependency(999, 1, 'lodash', '4.17.21');
+assertTestTrue(!$result2, 'addDependency() should return false when component ID does not match the version.');
+
 echo "ComponentRepository tests passed.\n";
