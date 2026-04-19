@@ -42,15 +42,27 @@ $langIcons = [
                 <div style="margin-bottom:12px">
                     <div class="form-group" style="margin-bottom:8px">
                         <strong><i class="fas fa-comment"></i> Reuse justification:</strong>
-                        <p style="margin:4px 0 0 0; white-space:pre-wrap"><?= $hld->reuseJustification !== '' ? htmlspecialchars($hld->reuseJustification, ENT_QUOTES, 'UTF-8') : '<span class="no-deps">Not specified</span>' ?></p>
+                        <?php if ($hld->reuseJustification !== ''): ?>
+                            <p style="margin:4px 0 0 0; white-space:pre-wrap"><?= htmlspecialchars($hld->reuseJustification, ENT_QUOTES, 'UTF-8') ?></p>
+                        <?php else: ?>
+                            <p style="margin:4px 0 0 0"><span class="no-deps">Not specified</span></p>
+                        <?php endif; ?>
                     </div>
                     <div class="form-group" style="margin-bottom:8px">
                         <strong><i class="fas fa-puzzle-piece"></i> Integration strategy:</strong>
-                        <p style="margin:4px 0 0 0; white-space:pre-wrap"><?= $hld->integrationStrategy !== '' ? htmlspecialchars($hld->integrationStrategy, ENT_QUOTES, 'UTF-8') : '<span class="no-deps">Not specified</span>' ?></p>
+                        <?php if ($hld->integrationStrategy !== ''): ?>
+                            <p style="margin:4px 0 0 0; white-space:pre-wrap"><?= htmlspecialchars($hld->integrationStrategy, ENT_QUOTES, 'UTF-8') ?></p>
+                        <?php else: ?>
+                            <p style="margin:4px 0 0 0"><span class="no-deps">Not specified</span></p>
+                        <?php endif; ?>
                     </div>
                     <div class="form-group" style="margin-bottom:8px">
                         <strong><i class="fas fa-flask"></i> Validation strategy:</strong>
-                        <p style="margin:4px 0 0 0; white-space:pre-wrap"><?= $hld->validationStrategy !== '' ? htmlspecialchars($hld->validationStrategy, ENT_QUOTES, 'UTF-8') : '<span class="no-deps">Not specified</span>' ?></p>
+                        <?php if ($hld->validationStrategy !== ''): ?>
+                            <p style="margin:4px 0 0 0; white-space:pre-wrap"><?= htmlspecialchars($hld->validationStrategy, ENT_QUOTES, 'UTF-8') ?></p>
+                        <?php else: ?>
+                            <p style="margin:4px 0 0 0"><span class="no-deps">Not specified</span></p>
+                        <?php endif; ?>
                     </div>
                 </div>
 
