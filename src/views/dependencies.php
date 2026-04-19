@@ -11,7 +11,7 @@ $langIcons = [
 ?>
     <div class="card-title-bar">
         <h2 class="card-title"><i class="fas fa-link"></i> Dependencies</h2>
-        <a href="?" class="btn btn-cancel"><i class="fas fa-arrow-left"></i> Back to list</a>
+        <a href="?" class="btn btn-cancel" title="Back to list"><i class="fas fa-arrow-left"></i></a>
     </div>
 
     <div class="deps-component-info">
@@ -33,8 +33,8 @@ $langIcons = [
                         <span class="deps-component-version"><?= htmlspecialchars($version->label, ENT_QUOTES, 'UTF-8') ?></span>
                     </h3>
                     <?php if ($version->dependencies !== []): ?>
-                        <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>&amp;check_cves=<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit">
-                            <i class="fas fa-shield-halved"></i> Check CVEs
+                        <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>&amp;check_cves=<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit" title="Check CVEs">
+                            <i class="fas fa-shield-halved"></i>
                         </a>
                     <?php endif; ?>
                 </div>
@@ -94,7 +94,7 @@ $langIcons = [
                             <input id="dep-version-<?= htmlspecialchars((string) $version->id, ENT_QUOTES, 'UTF-8') ?>" type="text" name="dep_version" placeholder="e.g. 2.0.13">
                         </div>
                         <div class="deps-inline-form-action">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add dependency</button>
+                            <button type="submit" class="btn btn-primary" title="Add dependency"><i class="fas fa-plus"></i></button>
                         </div>
                     </div>
                 </form>
@@ -113,7 +113,7 @@ $langIcons = [
                     <input id="new-version-label" type="text" name="version_label" placeholder="e.g. 2.0.0">
                 </div>
                 <div class="deps-inline-form-action">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add version</button>
+                    <button type="submit" class="btn btn-primary" title="Add version"><i class="fas fa-plus"></i></button>
                 </div>
             </div>
         </form>

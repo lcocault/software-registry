@@ -11,7 +11,7 @@ $langIcons = [
 ?>
     <div class="card-title-bar">
         <h2 class="card-title"><i class="fas fa-list-check"></i> Registered components</h2>
-        <a href="?action=register" class="btn btn-primary"><i class="fas fa-plus"></i> Register component</a>
+        <a href="?action=register" class="btn btn-primary" title="Register component"><i class="fas fa-plus"></i></a>
     </div>
     <?php if ($components === []): ?>
         <p class="empty-state"><i class="fas fa-inbox"></i> No components registered yet.</p>
@@ -61,7 +61,7 @@ $langIcons = [
                                     <span class="no-deps">None</span>
                                 <?php else: ?>
                                     <span class="dep-count"><?= $depCount ?></span>
-                                    <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-view"><i class="fas fa-eye"></i> View</a>
+                                    <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-view" title="View dependencies"><i class="fas fa-eye"></i></a>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -89,12 +89,12 @@ $langIcons = [
                                 <?php endif; ?>
                             </td>
                             <td class="actions">
-                                <a href="?edit=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit"><i class="fas fa-pen"></i> Edit</a>
-                                <a href="?high_level_deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit"><i class="fas fa-layer-group"></i> High-Level Deps</a>
+                                <a href="?edit=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit" title="Edit"><i class="fas fa-pen"></i></a>
+                                <a href="?high_level_deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit" title="High-Level Deps"><i class="fas fa-layer-group"></i></a>
                                 <form method="post">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
-                                    <button type="submit" class="btn btn-delete" onclick="return confirm('Delete this component?')"><i class="fas fa-trash"></i> Delete</button>
+                                    <button type="submit" class="btn btn-delete" title="Delete" onclick="return confirm('Delete this component?')"><i class="fas fa-trash"></i></button>
                                 </form>
                             </td>
                         </tr>

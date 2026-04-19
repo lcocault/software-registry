@@ -388,6 +388,46 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'add_catalog_entry') {
+        $entryName    = trim($_POST['catalog_name'] ?? '');
+        $entryVersion = trim($_POST['catalog_version'] ?? '');
+
+        if ($entryName === '' || $entryVersion === '') {
+            $message = 'Component name and version are required.';
+            $messageType = 'error';
+        } elseif (strlen($entryName) > 255 || strlen($entryVersion) > 100) {
+            $message = 'Name must be at most 255 characters and version at most 100 characters.';
+            $messageType = 'error';
+        } else {
+            try {
+                $repository->addCatalogEntry($entryName, $entryVersion);
+                header('Location: ?action=catalog');
+                exit;
+            } catch (Throwable $exception) {
+                $message = 'Unable to add catalog entry: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
+    } elseif ($action === 'add_catalog_version') {
+        $entryName    = trim($_POST['catalog_name'] ?? '');
+        $entryVersion = trim($_POST['catalog_version'] ?? '');
+
+        if ($entryName === '' || $entryVersion === '') {
+            $message = 'Component name and version are required.';
+            $messageType = 'error';
+        } elseif (strlen($entryName) > 255 || strlen($entryVersion) > 100) {
+            $message = 'Name must be at most 255 characters and version at most 100 characters.';
+            $messageType = 'error';
+        } else {
+            try {
+                $repository->addCatalogEntry($entryName, $entryVersion);
+                header('Location: ?action=catalog&catalog_dep=' . urlencode($entryName));
+                exit;
+            } catch (Throwable $exception) {
+                $message = 'Unable to add catalog version: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
     } else {
         $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
@@ -568,10 +608,19 @@ if ($repository !== null && $cveRepository !== null && $_SERVER['REQUEST_METHOD'
     }
 }
 
-$showCatalogSection = isset($_GET['action']) && $_GET['action'] === 'catalog';
+$showCatalogSection = (isset($_GET['action']) && $_GET['action'] === 'catalog')
+    || (
+        $_SERVER['REQUEST_METHOD'] === 'POST'
+        && in_array($_POST['action'] ?? '', ['add_catalog_entry', 'add_catalog_version'], true)
+        && $messageType === 'error'
+    );
 
-if ($repository !== null && $showCatalogSection && $_SERVER['REQUEST_METHOD'] === 'GET') {
-    $catalogDepName    = isset($_GET['catalog_dep']) ? trim($_GET['catalog_dep']) : null;
+if ($repository !== null && $showCatalogSection) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_catalog_version') {
+        $catalogDepName = trim($_POST['catalog_name'] ?? '') ?: null;
+    } else {
+        $catalogDepName = isset($_GET['catalog_dep']) ? trim($_GET['catalog_dep']) : null;
+    }
     $catalogDepVersion = isset($_GET['catalog_version']) ? trim($_GET['catalog_version']) : null;
 
     try {
@@ -660,8 +709,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency', 'add_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party'], true)
-    && $messageType === 'error';
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency', 'add_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party', 'add_catalog_entry', 'add_catalog_version'], true)
 
 $showUserForm = $editUser !== null
     || (isset($_GET['action']) && $_GET['action'] === 'register_user')
@@ -992,8 +1040,9 @@ $showForm = $editComponent !== null
         .btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
-            padding: 7px 16px;
+            padding: 7px 10px;
             border-radius: 6px;
             font-size: .9em;
             font-weight: 500;
