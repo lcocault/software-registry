@@ -5,7 +5,7 @@
 ?>
     <div class="card-title-bar">
         <h2 class="card-title"><i class="fas fa-cube"></i> <?= htmlspecialchars($catalogDepName, ENT_QUOTES, 'UTF-8') ?></h2>
-        <a href="?action=catalog" class="btn btn-cancel"><i class="fas fa-arrow-left"></i> Back to 3rd party</a>
+        <a href="?action=catalog" class="btn btn-cancel" title="Back to 3rd party"><i class="fas fa-arrow-left"></i></a>
     </div>
     <?php if ($catalogVersions === []): ?>
         <p class="empty-state"><i class="fas fa-inbox"></i> No versions found for this dependency.</p>
@@ -56,7 +56,7 @@
                     <input id="catalog-new-version" type="text" name="catalog_version" placeholder="e.g. 6.1.0" value="<?= htmlspecialchars($_POST['catalog_version'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                 </div>
                 <div class="deps-inline-form-action">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add version</button>
+                    <button type="submit" class="btn btn-primary" title="Add version"><i class="fas fa-plus"></i></button>
                 </div>
             </div>
         </form>

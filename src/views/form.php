@@ -52,10 +52,9 @@
             </div>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" title="<?= $editComponent !== null ? 'Update component' : 'Register component' ?>">
                 <i class="fas <?= $editComponent !== null ? 'fa-floppy-disk' : 'fa-plus' ?>"></i>
-                <?= $editComponent !== null ? 'Update component' : 'Register component' ?>
             </button>
-            <a href="." class="btn btn-cancel"><i class="fas fa-xmark"></i> Cancel</a>
+            <a href="." class="btn btn-cancel" title="Cancel"><i class="fas fa-xmark"></i></a>
         </div>
     </form>
