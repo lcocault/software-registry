@@ -910,8 +910,9 @@ $showForm = $editComponent !== null
         .btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
-            padding: 7px 16px;
+            padding: 7px 10px;
             border-radius: 6px;
             font-size: .9em;
             font-weight: 500;

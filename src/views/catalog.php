@@ -47,7 +47,7 @@
                     <input id="catalog-entry-version" type="text" name="catalog_version" placeholder="e.g. 6.1.0" value="<?= htmlspecialchars($_POST['catalog_version'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                 </div>
                 <div class="deps-inline-form-action">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add</button>
+                    <button type="submit" class="btn btn-primary" title="Add component"><i class="fas fa-plus"></i></button>
                 </div>
             </div>
         </form>

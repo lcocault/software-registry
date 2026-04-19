@@ -20,7 +20,7 @@ $depLanguage = $catalogUsing !== [] ? $catalogUsing[0]->language : '';
             <span class="deps-component-name"><?= htmlspecialchars($catalogDepName, ENT_QUOTES, 'UTF-8') ?></span>
             <span class="deps-component-version"><?= htmlspecialchars($catalogDepVersion, ENT_QUOTES, 'UTF-8') ?></span>
         </h2>
-        <a href="?action=catalog&amp;catalog_dep=<?= urlencode($catalogDepName) ?>" class="btn btn-cancel"><i class="fas fa-arrow-left"></i> Back to versions</a>
+        <a href="?action=catalog&amp;catalog_dep=<?= urlencode($catalogDepName) ?>" class="btn btn-cancel" title="Back to versions"><i class="fas fa-arrow-left"></i></a>
     </div>
     <?php if ($catalogUsing === []): ?>
         <p class="empty-state"><i class="fas fa-inbox"></i> No components are currently using this version.</p>
@@ -73,7 +73,7 @@ $depLanguage = $catalogUsing !== [] ? $catalogUsing[0]->language : '';
                 <input type="hidden" name="dep_name" value="<?= htmlspecialchars($catalogDepName, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="dep_version" value="<?= htmlspecialchars($catalogDepVersion, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="dep_language" value="<?= htmlspecialchars($depLanguage, ENT_QUOTES, 'UTF-8') ?>">
-                <button type="submit" class="btn btn-edit"><i class="fas fa-rotate"></i> Refresh CVEs</button>
+                <button type="submit" class="btn btn-edit" title="Refresh CVEs"><i class="fas fa-rotate"></i></button>
             </form>
         </div>
         <?php if ($catalogCves === null || $catalogCves === []): ?>
