@@ -1,4 +1,4 @@
--- Migration 005: Add component-level high-level dependencies.
+-- Migration 006: Add component-level high-level dependencies.
 --
 -- A high-level dependency belongs to a component (not a specific version).
 -- It has a name, a reuse justification, an integration strategy, a validation
