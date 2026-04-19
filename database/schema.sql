@@ -63,3 +63,21 @@ CREATE TABLE IF NOT EXISTS dependency_cves (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dependency_cves_dep ON dependency_cves(dependency_name, dependency_version);
+
+CREATE TABLE IF NOT EXISTS component_high_level_deps (
+    id                   SERIAL PRIMARY KEY,
+    component_id         INTEGER NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+    name                 VARCHAR(255) NOT NULL,
+    reuse_justification  TEXT NOT NULL DEFAULT '',
+    integration_strategy TEXT NOT NULL DEFAULT '',
+    validation_strategy  TEXT NOT NULL DEFAULT '',
+    UNIQUE (component_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_component_hld_component_id ON component_high_level_deps(component_id);
+
+CREATE TABLE IF NOT EXISTS high_level_dep_third_party (
+    high_level_dep_id INTEGER      NOT NULL REFERENCES component_high_level_deps(id) ON DELETE CASCADE,
+    dependency_name   VARCHAR(255) NOT NULL,
+    PRIMARY KEY (high_level_dep_id, dependency_name)
+);

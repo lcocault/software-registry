@@ -308,6 +308,144 @@ final class ComponentRepository
     }
 
     /**
+     * Returns a Component with its high-level dependencies loaded.
+     */
+    public function findByIdWithHighLevelDeps(int $id): ?Component
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT c.id, c.name, c.owner_id,
+                    u.firstname || \' \' || u.name AS owner_name,
+                    c.language, p.name AS project_name
+             FROM components c
+             JOIN projects p ON p.id = c.project_id
+             JOIN users u ON u.id = c.owner_id
+             WHERE c.id = :id'
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+
+        if ($row === false) {
+            return null;
+        }
+
+        $highLevelDeps = $this->fetchHighLevelDeps([$id]);
+
+        return new Component(
+            (int) $row['id'],
+            $row['name'],
+            (int) $row['owner_id'],
+            $row['owner_name'],
+            $row['language'],
+            $row['project_name'],
+            [],
+            $highLevelDeps[$id] ?? [],
+        );
+    }
+
+    /**
+     * Adds a high-level dependency to a component.
+     * Returns the new high-level dependency ID, or false if the component does not exist.
+     */
+    public function addHighLevelDependency(
+        int $componentId,
+        string $name,
+        string $reuseJustification,
+        string $integrationStrategy,
+        string $validationStrategy,
+    ): int|false {
+        $stmt = $this->pdo->prepare('SELECT id FROM components WHERE id = :id');
+        $stmt->execute(['id' => $componentId]);
+        if ($stmt->fetchColumn() === false) {
+            return false;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO component_high_level_deps
+                 (component_id, name, reuse_justification, integration_strategy, validation_strategy)
+             VALUES(:component_id, :name, :reuse_justification, :integration_strategy, :validation_strategy)
+             RETURNING id'
+        );
+        $stmt->execute([
+            'component_id'         => $componentId,
+            'name'                 => $name,
+            'reuse_justification'  => $reuseJustification,
+            'integration_strategy' => $integrationStrategy,
+            'validation_strategy'  => $validationStrategy,
+        ]);
+        $id = (int) $stmt->fetchColumn();
+        $stmt->closeCursor();
+
+        return $id;
+    }
+
+    /**
+     * Deletes a high-level dependency from a component.
+     * Returns false if the high-level dependency does not belong to the component.
+     */
+    public function deleteHighLevelDependency(int $componentId, int $highLevelDepId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM component_high_level_deps WHERE id = :id AND component_id = :component_id'
+        );
+        $stmt->execute(['id' => $highLevelDepId, 'component_id' => $componentId]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Adds a 3rd party dependency name to a high-level dependency.
+     * Returns false if the high-level dependency does not belong to the component.
+     */
+    public function addHighLevelDepThirdParty(int $componentId, int $highLevelDepId, string $depName): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM component_high_level_deps WHERE id = :id AND component_id = :component_id'
+        );
+        $stmt->execute(['id' => $highLevelDepId, 'component_id' => $componentId]);
+        if ($stmt->fetchColumn() === false) {
+            return false;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO high_level_dep_third_party(high_level_dep_id, dependency_name)
+             VALUES(:high_level_dep_id, :dependency_name)
+             ON CONFLICT(high_level_dep_id, dependency_name) DO NOTHING'
+        );
+        $stmt->execute([
+            'high_level_dep_id' => $highLevelDepId,
+            'dependency_name'   => $depName,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Removes a 3rd party dependency name from a high-level dependency.
+     * Returns false if the link does not exist or does not belong to the component.
+     */
+    public function deleteHighLevelDepThirdParty(int $componentId, int $highLevelDepId, string $depName): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM component_high_level_deps WHERE id = :id AND component_id = :component_id'
+        );
+        $stmt->execute(['id' => $highLevelDepId, 'component_id' => $componentId]);
+        if ($stmt->fetchColumn() === false) {
+            return false;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM high_level_dep_third_party
+             WHERE high_level_dep_id = :high_level_dep_id AND dependency_name = :dependency_name'
+        );
+        $stmt->execute([
+            'high_level_dep_id' => $highLevelDepId,
+            'dependency_name'   => $depName,
+        ]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
      * Adds a new version label to an existing component.
      * Returns false if the component does not exist, true otherwise (idempotent).
      */
@@ -478,6 +616,96 @@ final class ComponentRepository
         foreach ($stmt->fetchAll() as $row) {
             $versionId = (int) $row['component_version_id'];
             $result[$versionId][] = new Dependency($row['name'], $row['version']);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param int[] $componentIds
+     * @return array<int, HighLevelDependency[]>  keyed by component_id
+     */
+    private function fetchHighLevelDeps(array $componentIds): array
+    {
+        if ($componentIds === []) {
+            return [];
+        }
+
+        $placeholderTokens = array_map(
+            static fn (int $index): string => ':id_' . $index,
+            array_keys($componentIds),
+        );
+        $stmt = $this->pdo->prepare(
+            'SELECT hld.id, hld.component_id, hld.name, hld.reuse_justification,
+                    hld.integration_strategy, hld.validation_strategy
+             FROM component_high_level_deps hld
+             WHERE hld.component_id IN (' . implode(', ', $placeholderTokens) . ')
+             ORDER BY hld.name'
+        );
+
+        $params = [];
+        foreach ($componentIds as $index => $componentId) {
+            $params['id_' . $index] = $componentId;
+        }
+        $stmt->execute($params);
+
+        $hldRows = $stmt->fetchAll();
+
+        if ($hldRows === []) {
+            return [];
+        }
+
+        $hldIds = array_map(static fn (array $row): int => (int) $row['id'], $hldRows);
+        $thirdPartyByHldId = $this->fetchHighLevelDepThirdParty($hldIds);
+
+        $result = [];
+        foreach ($hldRows as $row) {
+            $hldId       = (int) $row['id'];
+            $componentId = (int) $row['component_id'];
+            $result[$componentId][] = new HighLevelDependency(
+                $hldId,
+                $row['name'],
+                $row['reuse_justification'],
+                $row['integration_strategy'],
+                $row['validation_strategy'],
+                $thirdPartyByHldId[$hldId] ?? [],
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param int[] $hldIds
+     * @return array<int, string[]>  keyed by high_level_dep_id
+     */
+    private function fetchHighLevelDepThirdParty(array $hldIds): array
+    {
+        if ($hldIds === []) {
+            return [];
+        }
+
+        $placeholderTokens = array_map(
+            static fn (int $index): string => ':id_' . $index,
+            array_keys($hldIds),
+        );
+        $stmt = $this->pdo->prepare(
+            'SELECT hldtp.high_level_dep_id, hldtp.dependency_name
+             FROM high_level_dep_third_party hldtp
+             WHERE hldtp.high_level_dep_id IN (' . implode(', ', $placeholderTokens) . ')
+             ORDER BY hldtp.dependency_name'
+        );
+
+        $params = [];
+        foreach ($hldIds as $index => $hldId) {
+            $params['id_' . $index] = $hldId;
+        }
+        $stmt->execute($params);
+
+        $result = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $hldId = (int) $row['high_level_dep_id'];
+            $result[$hldId][] = $row['dependency_name'];
         }
 
         return $result;
