@@ -1079,7 +1079,7 @@ $showForm = $editComponent !== null
     <main>
         <nav class="nav-bar">
             <a href="." class="<?= !$showUsersSection && !$showCatalogSection ? 'active' : '' ?>"><i class="fas fa-cubes"></i> Components</a>
-            <a href="?action=catalog" class="<?= $showCatalogSection ? 'active' : '' ?>"><i class="fas fa-book"></i> Catalog</a>
+            <a href="?action=catalog" class="<?= $showCatalogSection ? 'active' : '' ?>"><i class="fas fa-book"></i> 3rd party</a>
             <a href="?action=users" class="<?= $showUsersSection ? 'active' : '' ?>"><i class="fas fa-users"></i> Users</a>
         </nav>
 
