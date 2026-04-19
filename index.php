@@ -26,6 +26,9 @@ $catalogVersions = null;
 $catalogDepVersion = null;
 $catalogUsing = null;
 $catalogCves = null;
+$viewCveCheckComponent = null;
+$viewCveCheckVersion = null;
+$viewCveCheckData = null;
 
 $repository = null;
 $userRepository = null;
@@ -195,6 +198,44 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'refresh_version_cves' && $repository !== null && $cveRepository !== null) {
+        $componentId = (int) ($_POST['component_id'] ?? 0);
+        $versionId   = (int) ($_POST['version_id'] ?? 0);
+
+        if ($componentId <= 0 || $versionId <= 0) {
+            $message = 'Invalid component or version for CVE refresh.';
+            $messageType = 'error';
+        } else {
+            try {
+                $comp = $repository->findByIdWithVersions($componentId);
+                if ($comp === null) {
+                    $message = 'Component not found.';
+                    $messageType = 'error';
+                } else {
+                    $matchedVersion = null;
+                    foreach ($comp->versions as $ver) {
+                        if ($ver->id === $versionId) {
+                            $matchedVersion = $ver;
+                            break;
+                        }
+                    }
+                    if ($matchedVersion === null) {
+                        $message = 'Version not found.';
+                        $messageType = 'error';
+                    } else {
+                        foreach ($matchedVersion->dependencies as $dep) {
+                            $freshCves = (new OsvClient())->getVulnerabilities($dep->name, $dep->version, $comp->language);
+                            $cveRepository->store($dep->name, $dep->version, $freshCves);
+                        }
+                        header('Location: ?deps=' . $componentId . '&check_cves=' . $versionId);
+                        exit;
+                    }
+                }
+            } catch (Throwable $exception) {
+                $message = 'Unable to refresh CVEs: ' . $exception->getMessage();
+                $messageType = 'error';
+            }
+        }
     } else {
         $name    = trim($_POST['name'] ?? '');
         $version = trim($_POST['version'] ?? '');
@@ -269,7 +310,7 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
 }
 
 $viewDepsComponent = null;
-if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['deps'])) {
+if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['deps']) && !isset($_GET['check_cves'])) {
     $depsId = (int) $_GET['deps'];
     if ($depsId > 0) {
         try {
@@ -280,6 +321,53 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
             }
         } catch (Throwable $exception) {
             $message = 'Unable to load component: ' . $exception->getMessage();
+            $messageType = 'error';
+        }
+    }
+}
+
+if ($repository !== null && $cveRepository !== null && $_SERVER['REQUEST_METHOD'] === 'GET'
+    && isset($_GET['deps'], $_GET['check_cves'])) {
+    $depsId         = (int) $_GET['deps'];
+    $checkVersionId = (int) $_GET['check_cves'];
+    if ($depsId > 0 && $checkVersionId > 0) {
+        try {
+            $viewCveCheckComponent = $repository->findByIdWithVersions($depsId);
+            if ($viewCveCheckComponent === null) {
+                $message = 'Component not found.';
+                $messageType = 'error';
+            } else {
+                foreach ($viewCveCheckComponent->versions as $ver) {
+                    if ($ver->id === $checkVersionId) {
+                        $viewCveCheckVersion = $ver;
+                        break;
+                    }
+                }
+                if ($viewCveCheckVersion === null) {
+                    $message = 'Version not found.';
+                    $messageType = 'error';
+                } else {
+                    $viewCveCheckData = [];
+                    foreach ($viewCveCheckVersion->dependencies as $dep) {
+                        $cves = $cveRepository->findByDependency($dep->name, $dep->version);
+                        if ($cves === null) {
+                            try {
+                                $cves = (new OsvClient())->getVulnerabilities(
+                                    $dep->name,
+                                    $dep->version,
+                                    $viewCveCheckComponent->language,
+                                );
+                                $cveRepository->store($dep->name, $dep->version, $cves);
+                            } catch (Throwable) {
+                                $cves = null;
+                            }
+                        }
+                        $viewCveCheckData[] = ['dep' => $dep, 'cves' => $cves];
+                    }
+                }
+            }
+        } catch (Throwable $exception) {
+            $message = 'Unable to load CVE data: ' . $exception->getMessage();
             $messageType = 'error';
         }
     }
@@ -329,7 +417,7 @@ if ($repository !== null && $showCatalogSection && $_SERVER['REQUEST_METHOD'] ==
 }
 
 $components = [];
-if ($repository !== null && $viewDepsComponent === null && !$showCatalogSection) {
+if ($repository !== null && $viewDepsComponent === null && $viewCveCheckData === null && !$showCatalogSection) {
     try {
         $components = $repository->listAll();
     } catch (Throwable $exception) {
@@ -361,7 +449,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves'], true)
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves'], true)
     && $messageType === 'error';
 
 $showUserForm = $editUser !== null
@@ -1038,7 +1126,11 @@ $showForm = $editComponent !== null
         </div>
         <?php endif; ?>
 
-        <?php if ($viewDepsComponent !== null): ?>
+        <?php if ($viewCveCheckData !== null): ?>
+        <div class="card">
+            <?php include __DIR__ . '/src/views/cve_check.php'; ?>
+        </div>
+        <?php elseif ($viewDepsComponent !== null): ?>
         <div class="card">
             <?php $component = $viewDepsComponent; include __DIR__ . '/src/views/dependencies.php'; ?>
         </div>
