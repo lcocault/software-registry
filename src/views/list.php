@@ -90,6 +90,7 @@ $langIcons = [
                             </td>
                             <td class="actions">
                                 <a href="?edit=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit" title="Edit"><i class="fas fa-pen"></i></a>
+                                <a href="?high_level_deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit" title="High-Level Deps"><i class="fas fa-layer-group"></i></a>
                                 <form method="post">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
