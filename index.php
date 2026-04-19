@@ -709,7 +709,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency', 'add_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party', 'add_catalog_entry', 'add_catalog_version'], true)
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency', 'add_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party', 'add_catalog_entry', 'add_catalog_version'], true);
 
 $showUserForm = $editUser !== null
     || (isset($_GET['action']) && $_GET['action'] === 'register_user')
