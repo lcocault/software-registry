@@ -1,6 +1,7 @@
 <?php
 // Variables expected:
-//   $components (Component[]) - list of components with their versions and dependencies
+//   $components   (Component[]) - list of components with their versions and dependencies
+//   $allCveCounts (array)       - [dep_name][dep_version] => int|absent for fetched CVE counts
 
 $langIcons = [
     'Java'       => 'fab fa-java',
@@ -25,6 +26,7 @@ $langIcons = [
                         <th><i class="fas fa-folder"></i> Project</th>
                         <th><i class="fas fa-code"></i> Language</th>
                         <th><i class="fas fa-link"></i> Dependencies</th>
+                        <th><i class="fas fa-shield-halved"></i> CVEs</th>
                         <th><i class="fas fa-gear"></i> Actions</th>
                     </tr>
                 </thead>
@@ -60,6 +62,30 @@ $langIcons = [
                                 <?php else: ?>
                                     <span class="dep-count"><?= $depCount ?></span>
                                     <a href="?deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-view"><i class="fas fa-eye"></i> View</a>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php
+                                    $componentCveTotal = 0;
+                                    $componentAnyFetched = false;
+                                    foreach ($component->versions as $ver) {
+                                        foreach ($ver->dependencies as $dep) {
+                                            $cveCount = $allCveCounts[$dep->name][$dep->version] ?? null;
+                                            if ($cveCount !== null) {
+                                                $componentAnyFetched = true;
+                                                $componentCveTotal += $cveCount;
+                                            }
+                                        }
+                                    }
+                                ?>
+                                <?php if ($depCount === 0): ?>
+                                    <span class="no-deps">—</span>
+                                <?php elseif (!$componentAnyFetched): ?>
+                                    <span class="cve-count-badge cve-count-unknown">?</span>
+                                <?php elseif ($componentCveTotal === 0): ?>
+                                    <span class="cve-count-badge cve-count-zero">0</span>
+                                <?php else: ?>
+                                    <span class="cve-count-badge cve-count-vuln"><?= $componentCveTotal ?></span>
                                 <?php endif; ?>
                             </td>
                             <td class="actions">

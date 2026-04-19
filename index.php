@@ -29,6 +29,7 @@ $catalogCves = null;
 $viewCveCheckComponent = null;
 $viewCveCheckVersion = null;
 $viewCveCheckData = null;
+$allCveCounts = [];
 
 $repository = null;
 $userRepository = null;
@@ -318,6 +319,8 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
             if ($viewDepsComponent === null) {
                 $message = 'Component not found.';
                 $messageType = 'error';
+            } elseif ($cveRepository !== null) {
+                $allCveCounts = $cveRepository->getAllCounts();
             }
         } catch (Throwable $exception) {
             $message = 'Unable to load component: ' . $exception->getMessage();
@@ -433,6 +436,9 @@ $components = [];
 if ($repository !== null && $viewDepsComponent === null && $viewCveCheckData === null && !$showCatalogSection) {
     try {
         $components = $repository->listAll();
+        if ($cveRepository !== null) {
+            $allCveCounts = $cveRepository->getAllCounts();
+        }
     } catch (Throwable $exception) {
         if ($message === null) {
             $message = 'Unable to load components: ' . $exception->getMessage();
@@ -882,6 +888,24 @@ $showForm = $editComponent !== null
         .empty-state i { font-size: 2em; display: block; margin-bottom: 10px; opacity: .4; }
 
         .no-deps { color: var(--text-secondary); font-style: italic; font-size: .9em; }
+
+        .cve-count-badge {
+            display: inline-block;
+            border-radius: 12px;
+            padding: 1px 8px;
+            font-size: .85em;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .cve-count-zero { background: #e8f5e9; border: 1px solid #68d391; color: #1b5e20; }
+        .cve-count-vuln { background: #ffe4e4; border: 1px solid #fc8181; color: #9b2c2c; }
+        .cve-count-unknown { background: var(--tr-stripe); border: 1px solid var(--border-color); color: var(--text-secondary); font-style: italic; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) .cve-count-zero { background: #0d2a17; border-color: #065f46; color: #6ee7b7; }
+            :root:not([data-theme="light"]) .cve-count-vuln { background: #3d0e0e; border-color: #7f1d1d; color: #f87171; }
+        }
+        [data-theme="dark"] .cve-count-zero { background: #0d2a17; border-color: #065f46; color: #6ee7b7; }
+        [data-theme="dark"] .cve-count-vuln { background: #3d0e0e; border-color: #7f1d1d; color: #f87171; }
 
         .dep-count {
             display: inline-block;

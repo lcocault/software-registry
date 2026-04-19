@@ -165,4 +165,54 @@ $repo->store('dep:x', '1.0.0', [new Cve('CVE-2021-11111', 'Vuln in 1.0.0', 'HIGH
 assertTestNull($repo->countByDependency('dep:x', '2.0.0'), 'countByDependency() should return null for a different version not yet fetched.');
 assertTestSame(1, $repo->countByDependency('dep:x', '1.0.0'), 'countByDependency() should return 1 for dep:x 1.0.0.');
 
+// ---------------------------------------------------------------------------
+// getAllCounts() — returns empty array when nothing has been fetched
+// ---------------------------------------------------------------------------
+
+$repo = new CveRepository(createCveTestPdo());
+assertTestSame([], $repo->getAllCounts(), 'getAllCounts() should return an empty array when no CVEs have been fetched.');
+
+// ---------------------------------------------------------------------------
+// getAllCounts() — returns counts for all fetched dependencies
+// ---------------------------------------------------------------------------
+
+$pdo = createCveTestPdo();
+$repo = new CveRepository($pdo);
+$repo->store('log4j:log4j', '1.2.17', [
+    new Cve('CVE-2021-44228', 'Remote code execution in Log4j', 'CRITICAL'),
+    new Cve('CVE-2022-23302', 'JMSSink deserialization', 'HIGH'),
+]);
+$repo->store('safe:lib', '3.0.0', []);
+$repo->store('dep:x', '1.0.0', [new Cve('CVE-2021-11111', 'Vuln in 1.0.0', 'HIGH')]);
+
+$counts = $repo->getAllCounts();
+
+assertTestSame(2, $counts['log4j:log4j']['1.2.17'], 'getAllCounts() should return 2 for log4j:log4j 1.2.17.');
+assertTestSame(0, $counts['safe:lib']['3.0.0'], 'getAllCounts() should return 0 for safe:lib 3.0.0 (fetched but no CVEs).');
+assertTestSame(1, $counts['dep:x']['1.0.0'], 'getAllCounts() should return 1 for dep:x 1.0.0.');
+
+// Unfetched version is absent from the result
+assertTestTrue(!isset($counts['dep:x']['2.0.0']), 'getAllCounts() should not contain an entry for an unfetched version.');
+// Unfetched dependency is absent from the result
+assertTestTrue(!isset($counts['other:lib']), 'getAllCounts() should not contain an entry for an unfetched dependency.');
+
+// ---------------------------------------------------------------------------
+// getAllCounts() — updated after a second store() call
+// ---------------------------------------------------------------------------
+
+$pdo = createCveTestPdo();
+$repo = new CveRepository($pdo);
+$repo->store('example:lib', '1.0.0', [
+    new Cve('CVE-2020-00001', 'Old vuln', 'LOW'),
+    new Cve('CVE-2020-00002', 'Another old', 'MEDIUM'),
+]);
+
+$counts = $repo->getAllCounts();
+assertTestSame(2, $counts['example:lib']['1.0.0'], 'getAllCounts() should return 2 before refresh.');
+
+$repo->store('example:lib', '1.0.0', [new Cve('CVE-2023-99999', 'New vuln', 'HIGH')]);
+
+$counts = $repo->getAllCounts();
+assertTestSame(1, $counts['example:lib']['1.0.0'], 'getAllCounts() should return 1 after refresh replaces CVEs.');
+
 echo "CveRepository tests passed.\n";
