@@ -63,3 +63,12 @@ CREATE TABLE IF NOT EXISTS dependency_cves (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dependency_cves_dep ON dependency_cves(dependency_name, dependency_version);
+
+CREATE TABLE IF NOT EXISTS catalog_entries (
+    id      SERIAL PRIMARY KEY,
+    name    VARCHAR(255) NOT NULL,
+    version VARCHAR(100) NOT NULL,
+    UNIQUE (name, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_name ON catalog_entries(name);

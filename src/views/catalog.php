@@ -33,3 +33,22 @@
             </table>
         </div>
     <?php endif; ?>
+    <div class="deps-add-version-section">
+        <h3 class="deps-version-label"><i class="fas fa-plus-circle"></i> Add new 3rd party component</h3>
+        <form method="post" class="deps-add-dep-form">
+            <input type="hidden" name="action" value="add_catalog_entry">
+            <div class="deps-inline-form">
+                <div class="form-group">
+                    <label for="catalog-entry-name"><i class="fas fa-cube"></i> Component name</label>
+                    <input id="catalog-entry-name" type="text" name="catalog_name" placeholder="e.g. org.springframework:spring-core" value="<?= htmlspecialchars($_POST['catalog_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="form-group">
+                    <label for="catalog-entry-version"><i class="fas fa-code-branch"></i> Version</label>
+                    <input id="catalog-entry-version" type="text" name="catalog_version" placeholder="e.g. 6.1.0" value="<?= htmlspecialchars($_POST['catalog_version'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="deps-inline-form-action">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add</button>
+                </div>
+            </div>
+        </form>
+    </div>
