@@ -70,10 +70,10 @@ $langIcons = [
                                     $componentAnyFetched = false;
                                     foreach ($component->versions as $ver) {
                                         foreach ($ver->dependencies as $dep) {
-                                            $cnt = $allCveCounts[$dep->name][$dep->version] ?? null;
-                                            if ($cnt !== null) {
+                                            $cveCount = $allCveCounts[$dep->name][$dep->version] ?? null;
+                                            if ($cveCount !== null) {
                                                 $componentAnyFetched = true;
-                                                $componentCveTotal += $cnt;
+                                                $componentCveTotal += $cveCount;
                                             }
                                         }
                                     }
