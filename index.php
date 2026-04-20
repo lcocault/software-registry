@@ -542,6 +542,8 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
             if ($viewHighLevelDepsComponent === null) {
                 $message = 'Component not found.';
                 $messageType = 'error';
+            } else {
+                $allDependencyNames = $repository->listDependencyNames();
             }
         } catch (Throwable $exception) {
             $message = 'Unable to load component: ' . $exception->getMessage();
@@ -555,6 +557,7 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
     if ($hldCompId > 0) {
         try {
             $viewHighLevelDepsComponent = $repository->findByIdWithHighLevelDeps($hldCompId);
+            $allDependencyNames = $repository->listDependencyNames();
         } catch (Throwable) {
             // silently ignore; the original error message is already set
         }
