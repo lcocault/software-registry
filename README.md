@@ -22,7 +22,39 @@ The registration form supports dependency import from:
 - Python: output from `pip list` (table or `name==version` format)
 - JavaScript: `package-lock.json`
 
-## Run locally
+## Run with Docker (recommended)
+
+This is the easiest way to run the application locally. You only need
+[Docker](https://docs.docker.com/get-docker/) and
+[Docker Compose](https://docs.docker.com/compose/install/) installed.
+
+1. Copy the example environment file and set a database password:
+   ```bash
+   cp .env.example .env
+   # Edit .env and replace "changeme" with a password of your choice
+   ```
+2. Build and start the services:
+   ```bash
+   docker compose up --build
+   ```
+   Docker Compose will:
+   - Build the PHP/Apache application image.
+   - Start a PostgreSQL 16 database and initialise it automatically with
+     `database/schema.sql`.
+   - Wait for the database to be healthy before starting the application.
+3. Open <http://localhost:8080> in your browser.
+
+To stop and remove the containers (data is kept in the `db_data` volume):
+```bash
+docker compose down
+```
+
+To also remove all stored data:
+```bash
+docker compose down -v
+```
+
+## Run locally (without Docker)
 
 1. Create a PostgreSQL database and configure:
    - `DB_HOST` (default `127.0.0.1`)
