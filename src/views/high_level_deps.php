@@ -1,6 +1,7 @@
 <?php
 // Variables expected:
-//   $component (Component) - the component whose high-level dependencies are displayed
+//   $component          (Component)                            - the component whose high-level dependencies are displayed
+//   $allDependencyNames (array<array{name:string}>|null)       - list of available 3rd party dependency names
 
 $langIcons = [
     'Java'       => 'fab fa-java',
@@ -104,12 +105,31 @@ $langIcons = [
                         <input type="hidden" name="high_level_dep_id" value="<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>">
                         <div class="deps-inline-form">
                             <div class="form-group">
-                                <label for="dep-name-<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-cube"></i> Dependency name</label>
-                                <input id="dep-name-<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>" type="text" name="dep_name" placeholder="e.g. org.slf4j:slf4j-api">
+                                <label for="dep-name-<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-cube"></i> 3rd party component</label>
+                                <?php
+                                    $linkedNames   = $hld->thirdPartyDependencies;
+                                    $linkedIndex   = array_flip($linkedNames);
+                                    $availableNames = array_filter(
+                                        $allDependencyNames ?? [],
+                                        static fn (array $entry): bool => !isset($linkedIndex[$entry['name']]),
+                                    );
+                                ?>
+                                <?php if (empty($availableNames)): ?>
+                                    <p class="empty-state" style="margin:4px 0"><i class="fas fa-info-circle"></i> No additional 3rd party components available.</p>
+                                <?php else: ?>
+                                    <select id="dep-name-<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>" name="dep_name" required>
+                                        <option value="" disabled selected>— Select a 3rd party component —</option>
+                                        <?php foreach ($availableNames as $entry): ?>
+                                            <option value="<?= htmlspecialchars($entry['name'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($entry['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
                             </div>
+                            <?php if (!empty($availableNames)): ?>
                             <div class="deps-inline-form-action">
                                 <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Link dependency</button>
                             </div>
+                            <?php endif; ?>
                         </div>
                     </form>
                 </div>
