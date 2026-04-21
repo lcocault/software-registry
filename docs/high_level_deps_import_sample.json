@@ -1,0 +1,39 @@
+{
+  "highLevelDependencies": [
+    {
+      "name": "Logging",
+      "license": "MIT License",
+      "reuseJustification": "Provides structured, levelled logging across all application layers.",
+      "integrationStrategy": "Use the SLF4J facade so the underlying implementation can be swapped without changing application code.",
+      "validationStrategy": "Unit tests verify that every log call site produces the expected log level and message.",
+      "thirdPartyDependencies": [
+        "ch.qos.logback:logback-classic",
+        "org.slf4j:slf4j-api"
+      ]
+    },
+    {
+      "name": "HTTP Client",
+      "license": "Apache 2.0",
+      "reuseJustification": "Avoids reimplementing connection pooling, retries, and TLS handling.",
+      "integrationStrategy": "Wrap the client behind an application-level interface so it can be mocked in tests.",
+      "validationStrategy": "Integration tests run against a local WireMock stub server.",
+      "thirdPartyDependencies": [
+        "org.apache.httpcomponents.client5:httpclient5"
+      ]
+    },
+    {
+      "name": "JSON Serialisation",
+      "license": "Apache 2.0",
+      "reuseJustification": "Standard, well-tested library used across the whole organisation.",
+      "integrationStrategy": "Configure a shared ObjectMapper bean and inject it wherever serialisation is needed.",
+      "validationStrategy": "Round-trip tests for every data-transfer object.",
+      "thirdPartyDependencies": [
+        "com.fasterxml.jackson.core:jackson-databind"
+      ]
+    },
+    {
+      "name": "Security — Minimal entry",
+      "thirdPartyDependencies": []
+    }
+  ]
+}

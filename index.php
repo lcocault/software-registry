@@ -13,6 +13,7 @@ require_once __DIR__ . '/src/database/ComponentRepository.php';
 require_once __DIR__ . '/src/database/UserRepository.php';
 require_once __DIR__ . '/src/database/CveRepository.php';
 require_once __DIR__ . '/src/DependencyParser.php';
+require_once __DIR__ . '/src/HighLevelDependencyParser.php';
 require_once __DIR__ . '/src/OsvClient.php';
 
 $languages = ['Java', 'Python', 'JavaScript'];
@@ -470,6 +471,61 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                 $messageType = 'error';
             }
         }
+    } elseif ($action === 'import_high_level_deps') {
+        $componentId = (int) ($_POST['component_id'] ?? 0);
+
+        if ($componentId <= 0) {
+            $message = 'Invalid component ID.';
+            $messageType = 'error';
+        } else {
+            $upload = $_FILES['high_level_deps_file'] ?? null;
+            if (!$upload || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                $message = 'No file uploaded or upload error.';
+                $messageType = 'error';
+            } else {
+                $size = (int) ($upload['size'] ?? 0);
+                if ($size > $maxDependencyImportFileSize) {
+                    $message = 'File is too large (max 2 MB).';
+                    $messageType = 'error';
+                } else {
+                    $content = file_get_contents($upload['tmp_name']);
+                    if ($content === false) {
+                        $message = 'Unable to read the uploaded file.';
+                        $messageType = 'error';
+                    } else {
+                        try {
+                            $parsedDeps = HighLevelDependencyParser::parse($content);
+                            $imported = 0;
+                            foreach ($parsedDeps as $dep) {
+                                $hldId = $repository->addHighLevelDependency(
+                                    $componentId,
+                                    $dep['name'],
+                                    $dep['reuseJustification'],
+                                    $dep['integrationStrategy'],
+                                    $dep['validationStrategy'],
+                                    $dep['license'],
+                                );
+                                if ($hldId !== false) {
+                                    foreach ($dep['thirdPartyDependencies'] as $depName) {
+                                        $repository->addHighLevelDepThirdParty($componentId, $hldId, $depName);
+                                    }
+                                    $imported++;
+                                }
+                            }
+                            $message = sprintf('%d high-level dependenc%s imported successfully.', $imported, $imported === 1 ? 'y' : 'ies');
+                            header('Location: ?high_level_deps=' . $componentId . '&msg=' . urlencode($message));
+                            exit;
+                        } catch (RuntimeException $exception) {
+                            $message = 'Import failed: ' . $exception->getMessage();
+                            $messageType = 'error';
+                        } catch (Throwable $exception) {
+                            $message = 'Unable to import high-level dependencies: ' . $exception->getMessage();
+                            $messageType = 'error';
+                        }
+                    }
+                }
+            }
+        }
     } elseif ($action === 'add_catalog_entry') {
         $entryName    = trim($_POST['catalog_name'] ?? '');
         $entryVersion = trim($_POST['catalog_version'] ?? '');
@@ -629,6 +685,9 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
                 if (isset($_GET['edit_hld'])) {
                     $editHighLevelDepId = (int) $_GET['edit_hld'];
                 }
+                if (isset($_GET['msg']) && is_string($_GET['msg']) && $_GET['msg'] !== '') {
+                    $message = $_GET['msg'];
+                }
             }
         } catch (Throwable $exception) {
             $message = 'Unable to load component: ' . $exception->getMessage();
@@ -636,7 +695,7 @@ if ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET[
         }
     }
 } elseif ($repository !== null && $_SERVER['REQUEST_METHOD'] === 'POST'
-    && in_array($_POST['action'] ?? '', ['add_high_level_dep', 'edit_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party'], true)
+    && in_array($_POST['action'] ?? '', ['add_high_level_dep', 'edit_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party', 'import_high_level_deps'], true)
     && $messageType === 'error') {
     $hldCompId = (int) ($_POST['component_id'] ?? 0);
     if ($hldCompId > 0) {
@@ -800,7 +859,7 @@ $showUsersSection = (isset($_GET['action']) && $_GET['action'] === 'users')
     );
 
 $isFailedFormSubmission = $_SERVER['REQUEST_METHOD'] === 'POST'
-    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency', 'add_high_level_dep', 'edit_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party', 'add_catalog_entry', 'add_catalog_version'], true);
+    && !in_array($_POST['action'] ?? 'create', ['delete', 'delete_user', 'create_user', 'update_user', 'refresh_cves', 'refresh_version_cves', 'add_version', 'add_dependency', 'add_high_level_dep', 'edit_high_level_dep', 'delete_high_level_dep', 'add_high_level_dep_third_party', 'delete_high_level_dep_third_party', 'import_high_level_deps', 'add_catalog_entry', 'add_catalog_version'], true);
 
 $showUserForm = $editUser !== null
     || (isset($_GET['action']) && $_GET['action'] === 'register_user')

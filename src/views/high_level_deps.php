@@ -206,6 +206,27 @@ $licenseOptions = [
     <?php endif; ?>
 
     <div class="deps-add-version-section">
+        <h3 class="deps-version-label"><i class="fas fa-file-import"></i> Import high-level dependencies from JSON</h3>
+        <p style="margin:0 0 8px 0;color:#555;font-size:0.95em">
+            Upload a JSON file to bulk-import high-level dependencies. Each entry may include
+            <code>name</code> (required), <code>license</code>, <code>reuseJustification</code>,
+            <code>integrationStrategy</code>, <code>validationStrategy</code>, and
+            <code>thirdPartyDependencies</code> (array of strings). Entries whose name already exists are skipped.
+        </p>
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="import_high_level_deps">
+            <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
+            <div class="form-group">
+                <label for="hld-import-file"><i class="fas fa-file-code"></i> JSON file</label>
+                <input id="hld-import-file" type="file" name="high_level_deps_file" accept=".json,application/json" required>
+            </div>
+            <div style="margin-top:8px">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Import</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="deps-add-version-section">
         <h3 class="deps-version-label"><i class="fas fa-plus-circle"></i> Add new high-level dependency</h3>
         <form method="post">
             <input type="hidden" name="action" value="add_high_level_dep">
