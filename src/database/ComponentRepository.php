@@ -380,6 +380,7 @@ final class ComponentRepository
         string $reuseJustification,
         string $integrationStrategy,
         string $validationStrategy,
+        string $license = '',
     ): int|false {
         $stmt = $this->pdo->prepare('SELECT id FROM components WHERE id = :id');
         $stmt->execute(['id' => $componentId]);
@@ -389,8 +390,8 @@ final class ComponentRepository
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO component_high_level_deps
-                 (component_id, name, reuse_justification, integration_strategy, validation_strategy)
-             VALUES(:component_id, :name, :reuse_justification, :integration_strategy, :validation_strategy)
+                 (component_id, name, reuse_justification, integration_strategy, validation_strategy, license)
+             VALUES(:component_id, :name, :reuse_justification, :integration_strategy, :validation_strategy, :license)
              RETURNING id'
         );
         $stmt->execute([
@@ -399,6 +400,7 @@ final class ComponentRepository
             'reuse_justification'  => $reuseJustification,
             'integration_strategy' => $integrationStrategy,
             'validation_strategy'  => $validationStrategy,
+            'license'              => $license,
         ]);
         $id = (int) $stmt->fetchColumn();
         $stmt->closeCursor();
@@ -665,7 +667,7 @@ final class ComponentRepository
         );
         $stmt = $this->pdo->prepare(
             'SELECT hld.id, hld.component_id, hld.name, hld.reuse_justification,
-                    hld.integration_strategy, hld.validation_strategy
+                    hld.integration_strategy, hld.validation_strategy, hld.license
              FROM component_high_level_deps hld
              WHERE hld.component_id IN (' . implode(', ', $placeholderTokens) . ')
              ORDER BY hld.name'
@@ -696,6 +698,7 @@ final class ComponentRepository
                 $row['reuse_justification'],
                 $row['integration_strategy'],
                 $row['validation_strategy'],
+                $row['license'],
                 $thirdPartyByHldId[$hldId] ?? [],
             );
         }

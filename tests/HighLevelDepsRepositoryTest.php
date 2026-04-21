@@ -68,6 +68,7 @@ function createHldTestPdo(): PDO
             reuse_justification  TEXT NOT NULL DEFAULT \'\',
             integration_strategy TEXT NOT NULL DEFAULT \'\',
             validation_strategy  TEXT NOT NULL DEFAULT \'\',
+            license              TEXT NOT NULL DEFAULT \'\',
             UNIQUE (component_id, name)
         );
         CREATE INDEX idx_component_hld_component_id ON component_high_level_deps(component_id);
@@ -121,7 +122,24 @@ assertTestSame('Logging', $hld->name, 'High-level dep name should match.');
 assertTestSame('We need structured logging.', $hld->reuseJustification, 'Reuse justification should match.');
 assertTestSame('Use SLF4J facade.', $hld->integrationStrategy, 'Integration strategy should match.');
 assertTestSame('Unit tests cover all log calls.', $hld->validationStrategy, 'Validation strategy should match.');
+assertTestSame('', $hld->license, 'New high-level dep should have empty license by default.');
 assertTestSame([], $hld->thirdPartyDependencies, 'New high-level dep should have no 3rd party dependencies.');
+
+// ---------------------------------------------------------------------------
+// addHighLevelDependency() — with license
+// ---------------------------------------------------------------------------
+
+$pdo     = createHldTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo    = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Bob2', 'Jones', 'bob2@example.com');
+$id      = $repo->save('licensed-service', '1.0.0', $ownerId, 'project-c', 'Java', []);
+$hldId   = $repo->addHighLevelDependency($id, 'HTTP Client', '', '', '', 'Apache 2.0');
+assertTestTrue(is_int($hldId) && $hldId > 0, 'addHighLevelDependency() with license should return a positive integer ID.');
+$component = $repo->findByIdWithHighLevelDeps($id);
+assertTestSame(1, count($component->highLevelDependencies), 'Component should have 1 high-level dependency after adding with license.');
+$hld = $component->highLevelDependencies[0];
+assertTestSame('Apache 2.0', $hld->license, 'License should match the value passed to addHighLevelDependency().');
 
 // ---------------------------------------------------------------------------
 // addHighLevelDependency() — component not found
