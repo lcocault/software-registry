@@ -409,6 +409,41 @@ final class ComponentRepository
     }
 
     /**
+     * Updates the fields of an existing high-level dependency.
+     * Returns false if the high-level dependency does not exist or does not belong to the component.
+     */
+    public function updateHighLevelDependency(
+        int $componentId,
+        int $highLevelDepId,
+        string $name,
+        string $reuseJustification,
+        string $integrationStrategy,
+        string $validationStrategy,
+        string $license = '',
+    ): bool {
+        $stmt = $this->pdo->prepare(
+            'UPDATE component_high_level_deps
+             SET name = :name,
+                 reuse_justification  = :reuse_justification,
+                 integration_strategy = :integration_strategy,
+                 validation_strategy  = :validation_strategy,
+                 license              = :license
+             WHERE id = :id AND component_id = :component_id'
+        );
+        $stmt->execute([
+            'id'                   => $highLevelDepId,
+            'component_id'         => $componentId,
+            'name'                 => $name,
+            'reuse_justification'  => $reuseJustification,
+            'integration_strategy' => $integrationStrategy,
+            'validation_strategy'  => $validationStrategy,
+            'license'              => $license,
+        ]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
      * Deletes a high-level dependency from a component.
      * Returns false if the high-level dependency does not belong to the component.
      */
