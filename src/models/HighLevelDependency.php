@@ -13,6 +13,7 @@ final class HighLevelDependency
         public readonly string $reuseJustification,
         public readonly string $integrationStrategy,
         public readonly string $validationStrategy,
+        public readonly string $license = '',
         public readonly array $thirdPartyDependencies = [],
     ) {}
 }

@@ -292,12 +292,34 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
         $reuseJustification = trim($_POST['reuse_justification'] ?? '');
         $integrationStrategy = trim($_POST['integration_strategy'] ?? '');
         $validationStrategy = trim($_POST['validation_strategy'] ?? '');
+        $license            = trim($_POST['license'] ?? '');
+
+        $allowedLicenses = [
+            '2-clause BSD License (free BSD)',
+            '3-clause BSD License (Modified / new BSD)',
+            'AGPL3',
+            'Apache 2.0',
+            'CDDL-1.0/CDDL1.1',
+            'CPL/EPL',
+            'GPL v2',
+            'GPL v3',
+            'LGPL v2.1',
+            'LGPL v3',
+            'MIT License',
+            'MPL2.0/MPL1.1',
+            'MS-PL',
+            'Proprietary',
+            'Other',
+        ];
 
         if ($componentId <= 0 || $hldName === '') {
             $message = 'Component ID and high-level dependency name are required.';
             $messageType = 'error';
         } elseif (strlen($hldName) > 255) {
             $message = 'High-level dependency name must be at most 255 characters.';
+            $messageType = 'error';
+        } elseif ($license !== '' && !in_array($license, $allowedLicenses, true)) {
+            $message = 'Invalid license value.';
             $messageType = 'error';
         } else {
             try {
@@ -307,6 +329,7 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                     $reuseJustification,
                     $integrationStrategy,
                     $validationStrategy,
+                    $license,
                 );
                 if ($result === false) {
                     $message = 'Component not found.';

@@ -42,6 +42,14 @@ $langIcons = [
 
                 <div style="margin-bottom:12px">
                     <div class="form-group" style="margin-bottom:8px">
+                        <strong><i class="fas fa-balance-scale"></i> License:</strong>
+                        <?php if ($hld->license !== ''): ?>
+                            <p style="margin:4px 0 0 0"><?= htmlspecialchars($hld->license, ENT_QUOTES, 'UTF-8') ?></p>
+                        <?php else: ?>
+                            <p style="margin:4px 0 0 0"><span class="no-deps">Not specified</span></p>
+                        <?php endif; ?>
+                    </div>
+                    <div class="form-group" style="margin-bottom:8px">
                         <strong><i class="fas fa-comment"></i> Reuse justification:</strong>
                         <?php if ($hld->reuseJustification !== ''): ?>
                             <p style="margin:4px 0 0 0; white-space:pre-wrap"><?= htmlspecialchars($hld->reuseJustification, ENT_QUOTES, 'UTF-8') ?></p>
@@ -145,6 +153,27 @@ $langIcons = [
             <div class="form-group">
                 <label for="hld-name"><i class="fas fa-layer-group"></i> Name</label>
                 <input id="hld-name" type="text" name="hld_name" placeholder="e.g. Logging" required>
+            </div>
+            <div class="form-group">
+                <label for="hld-license"><i class="fas fa-balance-scale"></i> License</label>
+                <select id="hld-license" name="license">
+                    <option value="">— Select a license —</option>
+                    <option value="2-clause BSD License (free BSD)">2-clause BSD License (free BSD)</option>
+                    <option value="3-clause BSD License (Modified / new BSD)">3-clause BSD License (Modified / new BSD)</option>
+                    <option value="AGPL3">AGPL3</option>
+                    <option value="Apache 2.0">Apache 2.0</option>
+                    <option value="CDDL-1.0/CDDL1.1">CDDL-1.0/CDDL1.1</option>
+                    <option value="CPL/EPL">CPL/EPL</option>
+                    <option value="GPL v2">GPL v2</option>
+                    <option value="GPL v3">GPL v3</option>
+                    <option value="LGPL v2.1">LGPL v2.1</option>
+                    <option value="LGPL v3">LGPL v3</option>
+                    <option value="MIT License">MIT License</option>
+                    <option value="MPL2.0/MPL1.1">MPL2.0/MPL1.1</option>
+                    <option value="MS-PL">MS-PL</option>
+                    <option value="Proprietary">Proprietary</option>
+                    <option value="Other">Other</option>
+                </select>
             </div>
             <div class="form-group">
                 <label for="hld-reuse-justification"><i class="fas fa-comment"></i> Reuse justification</label>

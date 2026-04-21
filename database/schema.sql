@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS component_high_level_deps (
     reuse_justification  TEXT NOT NULL DEFAULT '',
     integration_strategy TEXT NOT NULL DEFAULT '',
     validation_strategy  TEXT NOT NULL DEFAULT '',
+    license              VARCHAR(100) NOT NULL DEFAULT '',
     UNIQUE (component_id, name)
 );
 
