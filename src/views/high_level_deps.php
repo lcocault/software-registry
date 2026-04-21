@@ -2,11 +2,30 @@
 // Variables expected:
 //   $component          (Component)                            - the component whose high-level dependencies are displayed
 //   $allDependencyNames (array<array{name:string}>|null)       - list of available 3rd party dependency names
+//   $editHighLevelDepId (int)                                  - ID of the high-level dep to show in edit mode (0 = none)
 
 $langIcons = [
     'Java'       => 'fab fa-java',
     'Python'     => 'fab fa-python',
     'JavaScript' => 'fab fa-js',
+];
+$editHighLevelDepId = $editHighLevelDepId ?? 0;
+$licenseOptions = [
+    '2-clause BSD License (free BSD)',
+    '3-clause BSD License (Modified / new BSD)',
+    'AGPL3',
+    'Apache 2.0',
+    'CDDL-1.0/CDDL1.1',
+    'CPL/EPL',
+    'GPL v2',
+    'GPL v3',
+    'LGPL v2.1',
+    'LGPL v3',
+    'MIT License',
+    'MPL2.0/MPL1.1',
+    'MS-PL',
+    'Proprietary',
+    'Other',
 ];
 ?>
     <div class="card-title-bar">
@@ -32,13 +51,53 @@ $langIcons = [
                         <i class="fas fa-layer-group"></i>
                         <span class="deps-component-version"><?= htmlspecialchars($hld->name, ENT_QUOTES, 'UTF-8') ?></span>
                     </h3>
-                    <form method="post" style="margin:0">
-                        <input type="hidden" name="action" value="delete_high_level_dep">
-                        <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
-                        <input type="hidden" name="high_level_dep_id" value="<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>">
-                        <button type="submit" class="btn btn-delete" onclick="return confirm('Delete this high-level dependency?')"><i class="fas fa-trash"></i> Delete</button>
-                    </form>
+                    <div style="display:flex;gap:8px">
+                        <a href="?high_level_deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>&amp;edit_hld=<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-edit"><i class="fas fa-pen"></i> Edit</a>
+                        <form method="post" style="margin:0">
+                            <input type="hidden" name="action" value="delete_high_level_dep">
+                            <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="high_level_dep_id" value="<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>">
+                            <button type="submit" class="btn btn-delete" onclick="return confirm('Delete this high-level dependency?')"><i class="fas fa-trash"></i> Delete</button>
+                        </form>
+                    </div>
                 </div>
+
+                <?php if ($editHighLevelDepId === $hld->id): ?>
+                <form method="post">
+                    <input type="hidden" name="action" value="edit_high_level_dep">
+                    <input type="hidden" name="component_id" value="<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="high_level_dep_id" value="<?= htmlspecialchars((string) $hld->id, ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="form-group">
+                        <label><i class="fas fa-layer-group"></i> Name</label>
+                        <input type="text" name="hld_name" value="<?= htmlspecialchars($hld->name, ENT_QUOTES, 'UTF-8') ?>" required maxlength="255">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-balance-scale"></i> License</label>
+                        <select name="license">
+                            <option value="">— Select a license —</option>
+                            <?php foreach ($licenseOptions as $opt): ?>
+                                <option value="<?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>"<?= $hld->license === $opt ? ' selected' : '' ?>><?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-comment"></i> Reuse justification</label>
+                        <textarea name="reuse_justification" rows="3"><?= htmlspecialchars($hld->reuseJustification, ENT_QUOTES, 'UTF-8') ?></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-puzzle-piece"></i> Integration strategy</label>
+                        <textarea name="integration_strategy" rows="3"><?= htmlspecialchars($hld->integrationStrategy, ENT_QUOTES, 'UTF-8') ?></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-flask"></i> Validation strategy</label>
+                        <textarea name="validation_strategy" rows="3"><?= htmlspecialchars($hld->validationStrategy, ENT_QUOTES, 'UTF-8') ?></textarea>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:8px">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save changes</button>
+                        <a href="?high_level_deps=<?= htmlspecialchars((string) $component->id, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-cancel"><i class="fas fa-times"></i> Cancel</a>
+                    </div>
+                </form>
+                <?php else: ?>
 
                 <div style="margin-bottom:12px">
                     <div class="form-group" style="margin-bottom:8px">
@@ -141,6 +200,7 @@ $langIcons = [
                         </div>
                     </form>
                 </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
@@ -158,21 +218,9 @@ $langIcons = [
                 <label for="hld-license"><i class="fas fa-balance-scale"></i> License</label>
                 <select id="hld-license" name="license">
                     <option value="">— Select a license —</option>
-                    <option value="2-clause BSD License (free BSD)">2-clause BSD License (free BSD)</option>
-                    <option value="3-clause BSD License (Modified / new BSD)">3-clause BSD License (Modified / new BSD)</option>
-                    <option value="AGPL3">AGPL3</option>
-                    <option value="Apache 2.0">Apache 2.0</option>
-                    <option value="CDDL-1.0/CDDL1.1">CDDL-1.0/CDDL1.1</option>
-                    <option value="CPL/EPL">CPL/EPL</option>
-                    <option value="GPL v2">GPL v2</option>
-                    <option value="GPL v3">GPL v3</option>
-                    <option value="LGPL v2.1">LGPL v2.1</option>
-                    <option value="LGPL v3">LGPL v3</option>
-                    <option value="MIT License">MIT License</option>
-                    <option value="MPL2.0/MPL1.1">MPL2.0/MPL1.1</option>
-                    <option value="MS-PL">MS-PL</option>
-                    <option value="Proprietary">Proprietary</option>
-                    <option value="Other">Other</option>
+                    <?php foreach ($licenseOptions as $opt): ?>
+                        <option value="<?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div class="form-group">

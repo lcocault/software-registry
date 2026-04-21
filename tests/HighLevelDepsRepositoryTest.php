@@ -343,3 +343,71 @@ $component = $repo->findByIdWithHighLevelDeps($id);
 assertTestNull($component, 'findByIdWithHighLevelDeps() should return null after component deletion.');
 
 echo "HighLevelDeps tests passed.\n";
+
+// ---------------------------------------------------------------------------
+// updateHighLevelDependency() — basic
+// ---------------------------------------------------------------------------
+
+$pdo     = createHldTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo    = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Pat', 'Young', 'pat@example.com');
+$id      = $repo->save('upd-lib', '1.0', $ownerId, 'proj', 'Java', []);
+$hldId   = $repo->addHighLevelDependency($id, 'Logging', 'Old justification', 'Old strategy', 'Old validation', 'MIT License');
+$updated = $repo->updateHighLevelDependency($id, $hldId, 'Metrics', 'New justification', 'New strategy', 'New validation', 'Apache 2.0');
+assertTestTrue($updated, 'updateHighLevelDependency() should return true when dep exists.');
+$component = $repo->findByIdWithHighLevelDeps($id);
+assertTestSame(1, count($component->highLevelDependencies), 'Component should still have 1 high-level dependency after update.');
+$hld = $component->highLevelDependencies[0];
+assertTestSame('Metrics', $hld->name, 'Updated name should match.');
+assertTestSame('New justification', $hld->reuseJustification, 'Updated reuse justification should match.');
+assertTestSame('New strategy', $hld->integrationStrategy, 'Updated integration strategy should match.');
+assertTestSame('New validation', $hld->validationStrategy, 'Updated validation strategy should match.');
+assertTestSame('Apache 2.0', $hld->license, 'Updated license should match.');
+
+// ---------------------------------------------------------------------------
+// updateHighLevelDependency() — clears optional fields when empty strings given
+// ---------------------------------------------------------------------------
+
+$pdo     = createHldTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo    = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Quinn', 'Hall', 'quinn@example.com');
+$id      = $repo->save('clr-lib', '1.0', $ownerId, 'proj', 'Java', []);
+$hldId   = $repo->addHighLevelDependency($id, 'HTTP Client', 'Some reason', 'Some strategy', 'Some validation', 'MIT License');
+$updated = $repo->updateHighLevelDependency($id, $hldId, 'HTTP Client', '', '', '', '');
+assertTestTrue($updated, 'updateHighLevelDependency() should return true when clearing optional fields.');
+$component = $repo->findByIdWithHighLevelDeps($id);
+$hld = $component->highLevelDependencies[0];
+assertTestSame('', $hld->reuseJustification, 'Reuse justification should be empty after clearing.');
+assertTestSame('', $hld->integrationStrategy, 'Integration strategy should be empty after clearing.');
+assertTestSame('', $hld->validationStrategy, 'Validation strategy should be empty after clearing.');
+assertTestSame('', $hld->license, 'License should be empty after clearing.');
+
+// ---------------------------------------------------------------------------
+// updateHighLevelDependency() — not found
+// ---------------------------------------------------------------------------
+
+$pdo     = createHldTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo    = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Rachel', 'King', 'rachel@example.com');
+$id      = $repo->save('my-lib', '1.0', $ownerId, 'proj', 'Java', []);
+$updated = $repo->updateHighLevelDependency($id, 999, 'New name', '', '', '');
+assertTestTrue(!$updated, 'updateHighLevelDependency() should return false for a non-existent high-level dep.');
+
+// ---------------------------------------------------------------------------
+// updateHighLevelDependency() — wrong component
+// ---------------------------------------------------------------------------
+
+$pdo     = createHldTestPdo();
+$userRepo = new UserRepository($pdo);
+$repo    = new ComponentRepository($pdo);
+$ownerId = $userRepo->save('Sam', 'Lee', 'sam@example.com');
+$id1     = $repo->save('lib-a', '1.0', $ownerId, 'proj', 'Java', []);
+$id2     = $repo->save('lib-b', '1.0', $ownerId, 'proj', 'Java', []);
+$hldId   = $repo->addHighLevelDependency($id1, 'Logging', '', '', '');
+$updated = $repo->updateHighLevelDependency($id2, $hldId, 'New name', '', '', '');
+assertTestTrue(!$updated, 'updateHighLevelDependency() should return false when component ID does not match.');
+
+echo "updateHighLevelDependency tests passed.\n";
