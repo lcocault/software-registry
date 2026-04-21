@@ -93,11 +93,11 @@ final class HighLevelDependencyParser
             }
 
             $reuseJustification  = isset($entry['reuseJustification']) && is_string($entry['reuseJustification'])
-                ? $entry['reuseJustification'] : '';
+                ? trim($entry['reuseJustification']) : '';
             $integrationStrategy = isset($entry['integrationStrategy']) && is_string($entry['integrationStrategy'])
-                ? $entry['integrationStrategy'] : '';
+                ? trim($entry['integrationStrategy']) : '';
             $validationStrategy  = isset($entry['validationStrategy']) && is_string($entry['validationStrategy'])
-                ? $entry['validationStrategy'] : '';
+                ? trim($entry['validationStrategy']) : '';
 
             $thirdPartyDependencies = [];
             if (isset($entry['thirdPartyDependencies'])) {
@@ -112,14 +112,15 @@ final class HighLevelDependencyParser
                             $depIndex,
                         ));
                     }
-                    if (strlen($dep) > 255) {
+                    $trimmedDep = trim($dep);
+                    if (strlen($trimmedDep) > 255) {
                         throw new RuntimeException(sprintf(
                             'Entry "%s": thirdPartyDependencies[%d] exceeds 255 characters.',
                             $name,
                             $depIndex,
                         ));
                     }
-                    $thirdPartyDependencies[] = $dep;
+                    $thirdPartyDependencies[] = $trimmedDep;
                 }
             }
 

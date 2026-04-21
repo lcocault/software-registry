@@ -489,7 +489,7 @@ if ($repository !== null && $userRepository !== null && $_SERVER['REQUEST_METHOD
                     $messageType = 'error';
                 } else {
                     $content = file_get_contents($upload['tmp_name']);
-                    if ($content === false || strlen($content) > $maxDependencyImportFileSize) {
+                    if ($content === false) {
                         $message = 'Unable to read the uploaded file.';
                         $messageType = 'error';
                     } else {
